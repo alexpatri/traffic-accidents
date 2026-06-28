@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+
+# Dados brutos (baixados via instruções do README) e camada gerada
+data/raw/*.csv
+data/raw/*.zip
+data/trusted/
+
+# Logs de execução do ETL
+logs/
+
+# Arquivos de IDE/SO
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Observação: outputs/ NÃO é ignorado — as figuras da EDA são referenciadas no README.
