@@ -11,9 +11,7 @@ venv/
 env/
 
 # Dados brutos (baixados via instruções do README) e camada gerada
-data/raw/*.csv
-data/raw/*.zip
-data/trusted/
+data/
 
 # Logs de execução do ETL
 logs/
