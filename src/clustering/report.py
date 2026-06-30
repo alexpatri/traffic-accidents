@@ -1,4 +1,8 @@
-"""Geração do relatório consolidado da Clusterização em Markdown."""
+"""Geração do relatório consolidado da Clusterização em Markdown.
+
+A entrega é a clusterização de trechos. A clusterização de acidentes foi investigada e
+não incluída — o relatório documenta esse achado negativo (seção 5).
+"""
 
 from __future__ import annotations
 
@@ -59,9 +63,8 @@ def _secao_trechos(r: dict[str, Any]) -> str:
 
 {tabela}
 
-> Médias/medianas das features de formação e o **desfecho retido** (`mortos`,
-> `feridos_graves`, `indice_gravidade_maximo`) — este último usado apenas para
-> caracterizar os grupos, não para formá-los.
+> Médias das features de formação e o **desfecho retido** (`mortos`, `feridos_graves`)
+> — este último usado apenas para caracterizar os grupos, não para formá-los.
 
 ### Interpretação dos perfis
 
@@ -75,175 +78,137 @@ def _secao_trechos(r: dict[str, Any]) -> str:
 
 Repetindo a clusterização sem `indice_gravidade_total` (3 features), o Silhouette em
 K={sens['k']} passou de {sens['silhouette_4feat']:.4f} (4 features) para
-{sens['silhouette_3feat']:.4f} (3 features) — documentado para transparência da
-decisão de manter as 4 features pedidas no enunciado.
+{sens['silhouette_3feat']:.4f} (3 features) — documentado para transparência da decisão
+de manter as 4 features pedidas no enunciado.
 
 ![Volume por cluster](figures/trechos_box_qtd_acidentes.png)
 ![Letalidade por cluster](figures/trechos_box_pct_acidentes_fatais.png)
 """
 
 
-def _secao_acidentes(r: dict[str, Any]) -> str:
-    perfis = "\n".join(
-        f"- **Cluster {p['cluster']} — {p['nome']}**: {p['descricao']}"
-        for p in r["perfis"]
-    )
-    tabela = _tabela_polars(
-        r["perfil"],
-        ["cluster", "n", "pct", "hora_circular", "pct_fds", "turno_moda",
-         "pista_moda", "ig_media", "pct_fatal"],
-        ["Cluster", "n", "%", "Hora típ.", "% FDS", "Turno",
-         "Pista", "Índ.méd", "% fatal"],
-    )
-    blocos = ", ".join(f"{b} ({len(c)})" for b, c in r["blocks"].items())
-    return f"""## 2. Clusterização dos Acidentes
+def _secao_cotovelo(r: dict[str, Any]) -> str:
+    return f"""## 2. Método do Cotovelo
 
-**Dataset:** `data/analytics/acidentes_analytics.parquet` ({r['n']:,} acidentes).
-**Matriz:** {r['n_features']} colunas em blocos ponderados — {blocos}.
-Somente variáveis conhecidas no momento do acidente (sem vazamento de desfecho).
-**Número de clusters:** **K = {r['k']}**.
+A inertia (SSE intra-cluster) cai com K; busca-se o ponto de inflexão a partir do qual o
+ganho marginal diminui.
 
-### Perfil de cada grupo
-
-{tabela}
-
-> `ig_media` e `% fatal` são o **desfecho retido**: descrevem a associação
-> contexto → severidade observada em cada grupo, sem terem sido usados na formação.
-
-### Interpretação dos perfis
-
-{perfis}
-
-![Clusters de acidentes em PCA 2D](figures/acidentes_pca.png)
-
-*Projeção PCA (somente visualização): {r['pca_var']:.1%} da variância em 2D — baixa,
-como esperado em dados majoritariamente one-hot; clusters sobrepostos na tela podem
-estar separados no espaço completo.*
-
-![Classe de gravidade por cluster](figures/acidentes_classe_gravidade.png)
-![Veículos por cluster](figures/acidentes_box_veiculos.png)
-"""
-
-
-def _secao_cotovelo(t: dict[str, Any], a: dict[str, Any]) -> str:
-    return f"""## 3. Método do Cotovelo
-
-A inertia (SSE intra-cluster) cai monotonicamente com K; busca-se o ponto de inflexão
-a partir do qual o ganho marginal diminui.
-
-### Trechos
-
-{_tabela_selecao(t['selection'])}
+{_tabela_selecao(r['selection'])}
 
 ![Cotovelo — Trechos](figures/trechos_elbow.png)
 
-Inflexão na região de K=3–4; escolhido **K={t['k']}**.
-
-### Acidentes
-
-{_tabela_selecao(a['selection'])}
-
-![Cotovelo — Acidentes](figures/acidentes_elbow.png)
-
-Curva suave (típico de dados mistos one-hot); inflexão difusa na região de K=4–6,
-escolhido **K={a['k']}**.
+Forte queda até K=3–4 (87.557 → 52.556 → 41.744) e desaceleração depois — inflexão na
+região de K=3–4; escolhido **K={r['k']}**.
 """
 
 
-def _secao_silhouette(t: dict[str, Any], a: dict[str, Any]) -> str:
-    return f"""## 4. Silhouette Score
+def _secao_silhouette(r: dict[str, Any]) -> str:
+    return f"""## 3. Silhouette Score
 
 Mede coesão × separação (−1 a 1). Calculado sobre amostra fixa de
-{t['selection'].sample_size:,} (trechos) e {a['selection'].sample_size:,} (acidentes)
-pontos — a métrica é O(n²) e inviável nas bases completas.
+{r['selection'].sample_size:,} trechos (a métrica é O(n²) e inviável na base completa).
 
 ![Silhouette — Trechos](figures/trechos_silhouette.png)
-![Silhouette — Acidentes](figures/acidentes_silhouette.png)
 
-**Comparação com o cotovelo:** o silhouette tende a favorecer K menores (grupos mais
-separados), enquanto o cotovelo admite K maiores. A escolha final concilia ambos com a
-**interpretabilidade** — o menor K cujos perfis contam uma história distinta e nomeável.
-Trechos: K={t['k']}. Acidentes: K={a['k']}.
+**Comparação com o cotovelo + escolha de K.** O Silhouette favorece K menores (pico em
+K=3 ≈ 0,48), enquanto o cotovelo admite K maiores. Optou-se por **K={r['k']}** por
+**interpretabilidade**: K=4 revela a estrutura 2×2 *volume × letalidade* — incluindo o
+grupo raro porém extremamente letal — a um custo mínimo de Silhouette frente a K=3. A
+decisão não foi apenas visual: concilia cotovelo, Silhouette e leitura dos perfis.
 """
 
 
-def _secao_descobertas(t: dict[str, Any], a: dict[str, Any]) -> str:
-    # Cluster de trechos mais crítico = maior letalidade média.
-    pt = t["perfil"].sort("pct_fatais_media", descending=True).row(0, named=True)
-    pa = a["perfil"].sort("ig_media", descending=True).row(0, named=True)
-    return f"""## 5. Principais Descobertas
+def _secao_descobertas(r: dict[str, Any]) -> str:
+    pt = r["perfil"].sort("pct_fatais_media", descending=True).row(0, named=True)
+    return f"""## 4. Principais Descobertas
 
-**Perfis de trechos encontrados.** A malha se separa essencialmente em dois eixos —
-*volume/exposição* (qtd de acidentes, índice total) e *letalidade por evento* (índice
-médio, % fatal). Surgem perfis como alto-volume/baixa-letalidade (corredores movimentados),
-baixo-volume/alta-letalidade (trechos pontuais porém letais) e grupos intermediários.
-O grupo mais crítico em letalidade é o **Cluster {pt['cluster']}**
-({pt['pct_fatais_media']:.1f}% de acidentes fatais em média).
+**Perfis de trechos encontrados.** A malha se separa em dois eixos — *volume/exposição*
+(qtd de acidentes, índice total) e *letalidade por evento* (índice médio, % fatal):
+corredores de alto volume e baixa letalidade, trechos raros porém letais, e grupos
+intermediário/benigno.
 
-**Perfis de acidentes encontrados.** Os grupos combinam janela temporal (hora circular,
-fim de semana), tipo de pista, uso do solo, causa predominante e meteorologia. O grupo
-de maior severidade observada (desfecho retido) é o **Cluster {pa['cluster']}**
-(índice médio {pa['ig_media']:.1f}, {pa['pct_fatal']:.1f}% fatais).
+**Grupo claramente mais crítico.** O **Cluster {pt['cluster']}**
+({pt['pct_fatais_media']:.1f}% de acidentes fatais em média, {pt['mortos_total']:,} mortos)
+reúne trechos de baixíssimo volume mas letalidade extrema — invisíveis num ranking por
+frequência. Confirma o insight da EDA de que **volume ≠ gravidade**.
 
-**Existem grupos claramente mais críticos?** Sim — em ambos os níveis há grupos
-destacados: trechos de alta letalidade e contextos de acidente associados a desfechos
-mais graves. Isso é associação contexto→severidade, **não relação causal**.
+**Como orientar recomendações de investimento.**
+- *Trechos raros e letais* → **intervenções pontuais de engenharia/sinalização**, de alto
+  retorno em vidas.
+- *Corredores de alto volume* → **fiscalização, capacidade e fluidez** (concentram feridos
+  por exposição, não por gravidade intrínseca).
+- *Trechos benignos* → baixa prioridade.
 
-**Como orientar recomendações de investimento.** Os trechos de alta letalidade (mesmo
-com baixo volume) sugerem intervenções de engenharia/sinalização pontuais de alto retorno
-em vidas; os de alto volume sugerem fiscalização e capacidade. Os perfis de acidentes
-indicam quando/onde concentrar fiscalização e campanhas (turno, fim de semana, causa,
-condição da via) — a ser quantificado na etapa seguinte de ML supervisionado.
+A quantificação do efeito de cada fator fica para a etapa de ML supervisionado. As leituras
+aqui são associativas, **não causais**.
 """
 
 
-def _secao_metodologia(a: dict[str, Any]) -> str:
+def _secao_acidentes() -> str:
+    return """## 5. Clusterização de Acidentes — investigada e não incluída
+
+A clusterização de acidentes foi testada, mas **não produziu perfis multivariados
+nítidos** e por isso não compõe a entrega (fica documentada aqui).
+
+- **Sem cotovelo** (com todas as features): a inertia cai de forma suave e linear
+  (88.781 → 82.787 → 77.421 → 73.826…), sem inflexão.
+- **Silhouette ≈ 0,13–0,17** (abaixo de 0,25) e **PCA 2D explica só ~28%** da variância —
+  os acidentes não se separam em grupos compactos.
+- **Reduzir features** (temporal + via + causa) elevou o Silhouette para ~0,27, mas os
+  grupos resultantes **apenas redescobrem a `tipo_pista`**: em K=3, os clusters têm
+  exatamente 70.020 / 61.512 / 14.153 registros — os tamanhos de Simples / Dupla /
+  Múltipla. Não são arquétipos novos; é uma única variável categórica dominante.
+
+**Conclusão.** Os acidentes variam num **continuum** estruturado sobretudo pela
+`tipo_pista` — e pista **Simples** concentra severidade (índice ~5,2; ~9,9% fatais) vs
+Dupla (~3,7; ~4,8%) e Múltipla (~3,5; ~4,0%). Isso **confirma a EDA**, não revela perfis
+inéditos. Parte do efeito é metodológica (KMeans euclidiano é fraco em dados
+majoritariamente one-hot); um método nativo para categóricos (K-prototypes) tenderia a
+recuperar a mesma partição. O conhecimento sobre contexto → severidade dos acidentes é
+melhor explorado pela EDA Analytics e pela etapa de ML supervisionado.
+"""
+
+
+def _secao_metodologia() -> str:
     return """## 6. Metodologia e Limitações
 
-**Pré-processamento.**
-- *Trechos:* `log1p` em `qtd_acidentes` e `indice_gravidade_total` (cauda longa);
-  `indice_gravidade_medio` e `pct_acidentes_fatais` mantidos (skew baixo / massa em 0);
-  `StandardScaler` nas 4. Decisão do usuário: severidade agregada é **descritor de
-  perfil do trecho**, não desfecho a prever — por isso entra na formação.
-- *Acidentes:* `hora` em sin/cos cíclico; `veiculos` em `log1p`+MinMax; categóricas em
-  one-hot com colapso de níveis raros (meteorologia → 4; causa → top-8 + Outros);
-  flags `tem_*` mantidas só com prevalência ≥ ~3%. One-hot/booleanos **não** são
-  padronizados (z-score explodiria dummies raras); peso de bloco (÷√nº de colunas)
-  equilibra a contribuição de cada grupo conceitual.
-- *Vazamento:* nenhuma variável de desfecho entra na matriz de acidentes (assert no
-  pré-processamento); `indice_gravidade`, `fatal`, `classe_gravidade`, `mortos`, etc.
-  são usados apenas para caracterizar os grupos.
+**Pré-processamento (trechos).** `log1p` em `qtd_acidentes` e `indice_gravidade_total`
+(cauda longa); `indice_gravidade_medio` e `pct_acidentes_fatais` mantidos (skew baixo /
+massa em 0); `StandardScaler` nas 4. A severidade agregada é tratada como **descritor de
+perfil do trecho** (não desfecho de um evento a prever), por isso entra na formação —
+conforme o enunciado.
 
-**Limitações.** O KMeans assume geometria euclidiana e clusters convexos/isotrópicos,
-o que é apenas aproximado em dados mistos com muitos one-hot (distância euclidiana em
-colunas 0/1 ≈ Hamming escalado). Alternativas mais adequadas — **K-prototypes** (nativo
-para misto), **Gower + Agglomerative/HDBSCAN** — ficam para iterações futuras (custo
-O(n²) exige amostragem em 145k linhas). A arquitetura já isola a troca de algoritmo em
-`cluster.fit_cluster(X, algo, k)`. Interpretações são associativas, não causais.
+**Algoritmo.** K-Means (`n_init=10`, `random_state` fixo). A arquitetura isola a troca de
+algoritmo em `cluster.fit_cluster(X, algo, k)`, permitindo Agglomerative/DBSCAN sem mexer
+no pré-processamento.
+
+**Limitações.** Interpretações são associativas, não causais. `pct_acidentes_fatais` é
+ruidoso em trechos de 1 acidente (0% ou 100%). O índice de gravidade depende dos pesos
+(12/6/2). Janela temporal curta (2024–2025).
 """
 
 
-def report(trechos_result: dict[str, Any], acidentes_result: dict[str, Any]) -> str:
-    """Gera e grava o relatório consolidado da clusterização.
+def report(trechos_result: dict[str, Any]) -> str:
+    """Gera e grava o relatório consolidado da clusterização (trechos).
 
     Returns:
         O caminho do relatório gravado (como string).
     """
     cabecalho = """# Relatório — Clusterização (Aprendizado Não Supervisionado)
 
-Etapa de descoberta de **perfis naturais** (não rankings) na malha rodoviária federal,
-em dois níveis independentes: trechos rodoviários e acidentes. Base para a etapa de ML
+Etapa de descoberta de **perfis naturais** (não rankings) na malha rodoviária federal. A
+entrega é a **clusterização de trechos rodoviários**; a clusterização de acidentes foi
+investigada e documentada como achado negativo (seção 5). Base para a etapa de ML
 supervisionado e para as recomendações de priorização de investimentos.
 """
     conteudo = "\n".join(
         [
             cabecalho,
             _secao_trechos(trechos_result),
-            _secao_acidentes(acidentes_result),
-            _secao_cotovelo(trechos_result, acidentes_result),
-            _secao_silhouette(trechos_result, acidentes_result),
-            _secao_descobertas(trechos_result, acidentes_result),
-            _secao_metodologia(acidentes_result),
+            _secao_cotovelo(trechos_result),
+            _secao_silhouette(trechos_result),
+            _secao_descobertas(trechos_result),
+            _secao_acidentes(),
+            _secao_metodologia(),
         ]
     )
     config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

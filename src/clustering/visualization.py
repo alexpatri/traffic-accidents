@@ -98,27 +98,3 @@ def plot_box_por_cluster(
     ax.set_title(titulo)
     ax.grid(True, axis="y", alpha=0.3)
     data.save_fig(fig, name)
-
-
-def plot_barras_proporcao(
-    matriz: pl.DataFrame, index_col: str, categorias: list[str], name: str, titulo: str
-) -> None:
-    """Barras empilhadas 100% de uma distribuição categórica por cluster.
-
-    `matriz` deve ter uma coluna `index_col` (cluster) e uma coluna por categoria
-    com a proporção (somando ~1 por linha).
-    """
-    clusters = matriz.get_column(index_col).to_list()
-    fig, ax = plt.subplots(figsize=config.FIGSIZE)
-    cmap = plt.get_cmap(config.CLUSTER_CMAP)
-    base = np.zeros(len(clusters))
-    for i, cat in enumerate(categorias):
-        vals = matriz.get_column(cat).to_numpy()
-        ax.bar([f"C{c}" for c in clusters], vals, bottom=base,
-               label=cat, color=cmap(i % 10))
-        base = base + vals
-    ax.set_xlabel("Cluster")
-    ax.set_ylabel("Proporção")
-    ax.set_title(titulo)
-    ax.legend(fontsize=8, bbox_to_anchor=(1.02, 1), loc="upper left")
-    data.save_fig(fig, name)

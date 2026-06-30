@@ -4,9 +4,9 @@ Para cada K em `config.K_RANGE` ajusta KMeans e calcula:
 - `inertia`: soma dos erros quadráticos intra-cluster (SSE) — base do cotovelo;
 - `silhouette`: coesão/separação média — base da escolha fina.
 
-Em bases grandes (acidentes, ~145k linhas) o silhouette é O(n²) e inviável na base
-completa: ele é avaliado numa amostra fixa (mesmos índices em todos os K, para que a
-curva seja comparável), enquanto o KMeans é ajustado na base inteira.
+O silhouette é O(n²) em memória/tempo; mesmo nos 33k trechos é avaliado numa amostra
+fixa (mesmos índices em todos os K, para que a curva seja comparável), enquanto o KMeans
+é ajustado na base inteira.
 """
 
 from __future__ import annotations

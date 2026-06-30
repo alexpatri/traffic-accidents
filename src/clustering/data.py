@@ -32,18 +32,6 @@ def load_trechos() -> pl.DataFrame:
     return df
 
 
-def load_acidentes() -> pl.DataFrame:
-    """Carrega a camada Analytics no nível acidente."""
-    if not config.ANALYTICS_FILE.exists():
-        raise FileNotFoundError(
-            f"Camada Analytics não encontrada: {config.ANALYTICS_FILE}. "
-            "Execute a Feature Engineering (python -m src.feature_engineering.main) antes."
-        )
-    df = pl.read_parquet(config.ANALYTICS_FILE)
-    logger.info("Acidentes carregado: %d linhas, %d colunas", df.height, df.width)
-    return df
-
-
 def save_fig(fig: plt.Figure, name: str) -> None:
     """Salva a figura em `FIG_DIR/<name>.png` e a fecha para liberar memória."""
     config.FIG_DIR.mkdir(parents=True, exist_ok=True)

@@ -1,7 +1,8 @@
 # Relatório — Clusterização (Aprendizado Não Supervisionado)
 
-Etapa de descoberta de **perfis naturais** (não rankings) na malha rodoviária federal,
-em dois níveis independentes: trechos rodoviários e acidentes. Base para a etapa de ML
+Etapa de descoberta de **perfis naturais** (não rankings) na malha rodoviária federal. A
+entrega é a **clusterização de trechos rodoviários**; a clusterização de acidentes foi
+investigada e documentada como achado negativo (seção 5). Base para a etapa de ML
 supervisionado e para as recomendações de priorização de investimentos.
 
 ## 1. Clusterização dos Trechos
@@ -20,9 +21,8 @@ supervisionado e para as recomendações de priorização de investimentos.
 | 2 | 2941 | 8.91 | 1.41 | 18.49 | 87.77 | 4410 | 2703 |
 | 3 | 13208 | 40.00 | 1.30 | 2.59 | 0.00 | 0 | 2411 |
 
-> Médias/medianas das features de formação e o **desfecho retido** (`mortos`,
-> `feridos_graves`, `indice_gravidade_maximo`) — este último usado apenas para
-> caracterizar os grupos, não para formá-los.
+> Médias das features de formação e o **desfecho retido** (`mortos`, `feridos_graves`)
+> — este último usado apenas para caracterizar os grupos, não para formá-los.
 
 ### Interpretação dos perfis
 
@@ -39,55 +39,16 @@ supervisionado e para as recomendações de priorização de investimentos.
 
 Repetindo a clusterização sem `indice_gravidade_total` (3 features), o Silhouette em
 K=4 passou de 0.4073 (4 features) para
-0.5247 (3 features) — documentado para transparência da
-decisão de manter as 4 features pedidas no enunciado.
+0.5247 (3 features) — documentado para transparência da decisão
+de manter as 4 features pedidas no enunciado.
 
 ![Volume por cluster](figures/trechos_box_qtd_acidentes.png)
 ![Letalidade por cluster](figures/trechos_box_pct_acidentes_fatais.png)
 
-## 2. Clusterização dos Acidentes
+## 2. Método do Cotovelo
 
-**Dataset:** `data/analytics/acidentes_analytics.parquet` (145,685 acidentes).
-**Matriz:** 25 colunas em blocos ponderados — temporal (3), operacional (1), via (4), meteorologia (4), causa (8), tracado (5).
-Somente variáveis conhecidas no momento do acidente (sem vazamento de desfecho).
-**Número de clusters:** **K = 5**.
-
-### Perfil de cada grupo
-
-| Cluster | n | % | Hora típ. | % FDS | Turno | Pista | Índ.méd | % fatal |
-|---|---|---|---|---|---|---|---|---|
-| 0 | 18895 | 12.97 | 15.80 | 100.00 | Tarde | Dupla | 3.88 | 5.39 |
-| 1 | 50443 | 34.62 | 15.60 | 33.20 | Noite | Simples | 5.19 | 10.03 |
-| 2 | 19673 | 13.50 | 14.20 | 35.60 | Tarde | Simples | 5.25 | 9.52 |
-| 3 | 14057 | 9.65 | 14.10 | 26.70 | Manhã | Múltipla | 3.54 | 3.99 |
-| 4 | 42617 | 29.25 | 13.60 | 0.00 | Manhã | Dupla | 3.66 | 4.51 |
-
-> `ig_media` e `% fatal` são o **desfecho retido**: descrevem a associação
-> contexto → severidade observada em cada grupo, sem terem sido usados na formação.
-
-### Interpretação dos perfis
-
-- **Cluster 0 — Tarde · pista Dupla · médio gravidade**: 18895 acidentes (13.0%); hora típica ~16h, 100% no fim de semana, 46% em área urbana; causa predominante 'Ausência de reação do condutor', tempo 'Céu Claro', média de 1.8 veículos; desfecho: índice médio 3.9, 5.4% fatais, 0.058 mortos/acidente.
-- **Cluster 1 — Noite · pista Simples · alto gravidade**: 50443 acidentes (34.6%); hora típica ~16h, 33% no fim de semana, 36% em área urbana; causa predominante 'Acessar a via sem observar a presença dos outros veículos', tempo 'Céu Claro', média de 2.1 veículos; desfecho: índice médio 5.2, 10.0% fatais, 0.121 mortos/acidente.
-- **Cluster 2 — Tarde · pista Simples · alto gravidade**: 19673 acidentes (13.5%); hora típica ~14h, 36% no fim de semana, 19% em área urbana; causa predominante 'Reação tardia ou ineficiente do condutor', tempo 'Céu Claro', média de 2.0 veículos; desfecho: índice médio 5.2, 9.5% fatais, 0.118 mortos/acidente.
-- **Cluster 3 — Manhã · pista Múltipla · baixo gravidade**: 14057 acidentes (9.7%); hora típica ~14h, 27% no fim de semana, 75% em área urbana; causa predominante 'Reação tardia ou ineficiente do condutor', tempo 'Céu Claro', média de 2.0 veículos; desfecho: índice médio 3.5, 4.0% fatais, 0.043 mortos/acidente.
-- **Cluster 4 — Manhã · pista Dupla · baixo gravidade**: 42617 acidentes (29.2%); hora típica ~14h, 0% no fim de semana, 50% em área urbana; causa predominante 'Ausência de reação do condutor', tempo 'Céu Claro', média de 2.0 veículos; desfecho: índice médio 3.7, 4.5% fatais, 0.049 mortos/acidente.
-
-![Clusters de acidentes em PCA 2D](figures/acidentes_pca.png)
-
-*Projeção PCA (somente visualização): 28.0% da variância em 2D — baixa,
-como esperado em dados majoritariamente one-hot; clusters sobrepostos na tela podem
-estar separados no espaço completo.*
-
-![Classe de gravidade por cluster](figures/acidentes_classe_gravidade.png)
-![Veículos por cluster](figures/acidentes_box_veiculos.png)
-
-## 3. Método do Cotovelo
-
-A inertia (SSE intra-cluster) cai monotonicamente com K; busca-se o ponto de inflexão
-a partir do qual o ganho marginal diminui.
-
-### Trechos
+A inertia (SSE intra-cluster) cai com K; busca-se o ponto de inflexão a partir do qual o
+ganho marginal diminui.
 
 | K | Inertia (SSE) | Silhouette |
 |---|---|---|
@@ -103,84 +64,78 @@ a partir do qual o ganho marginal diminui.
 
 ![Cotovelo — Trechos](figures/trechos_elbow.png)
 
-Inflexão na região de K=3–4; escolhido **K=4**.
+Forte queda até K=3–4 (87.557 → 52.556 → 41.744) e desaceleração depois — inflexão na
+região de K=3–4; escolhido **K=4**.
 
-### Acidentes
-
-| K | Inertia (SSE) | Silhouette |
-|---|---|---|
-| 2 | 88,781 | 0.1539 |
-| 3 | 82,787 | 0.1691 |
-| 4 | 77,421 | 0.1384 |
-| 5 | 73,826 | 0.1494 |
-| 6 | 69,535 | 0.1505 |
-| 7 | 67,826 | 0.1307 |
-| 8 | 64,857 | 0.1295 |
-| 9 | 61,731 | 0.1516 |
-| 10 | 60,747 | 0.1366 |
-
-![Cotovelo — Acidentes](figures/acidentes_elbow.png)
-
-Curva suave (típico de dados mistos one-hot); inflexão difusa na região de K=4–6,
-escolhido **K=5**.
-
-## 4. Silhouette Score
+## 3. Silhouette Score
 
 Mede coesão × separação (−1 a 1). Calculado sobre amostra fixa de
-10,000 (trechos) e 10,000 (acidentes)
-pontos — a métrica é O(n²) e inviável nas bases completas.
+10,000 trechos (a métrica é O(n²) e inviável na base completa).
 
 ![Silhouette — Trechos](figures/trechos_silhouette.png)
-![Silhouette — Acidentes](figures/acidentes_silhouette.png)
 
-**Comparação com o cotovelo:** o silhouette tende a favorecer K menores (grupos mais
-separados), enquanto o cotovelo admite K maiores. A escolha final concilia ambos com a
-**interpretabilidade** — o menor K cujos perfis contam uma história distinta e nomeável.
-Trechos: K=4. Acidentes: K=5.
+**Comparação com o cotovelo + escolha de K.** O Silhouette favorece K menores (pico em
+K=3 ≈ 0,48), enquanto o cotovelo admite K maiores. Optou-se por **K=4** por
+**interpretabilidade**: K=4 revela a estrutura 2×2 *volume × letalidade* — incluindo o
+grupo raro porém extremamente letal — a um custo mínimo de Silhouette frente a K=3. A
+decisão não foi apenas visual: concilia cotovelo, Silhouette e leitura dos perfis.
 
-## 5. Principais Descobertas
+## 4. Principais Descobertas
 
-**Perfis de trechos encontrados.** A malha se separa essencialmente em dois eixos —
-*volume/exposição* (qtd de acidentes, índice total) e *letalidade por evento* (índice
-médio, % fatal). Surgem perfis como alto-volume/baixa-letalidade (corredores movimentados),
-baixo-volume/alta-letalidade (trechos pontuais porém letais) e grupos intermediários.
-O grupo mais crítico em letalidade é o **Cluster 2**
-(87.8% de acidentes fatais em média).
+**Perfis de trechos encontrados.** A malha se separa em dois eixos — *volume/exposição*
+(qtd de acidentes, índice total) e *letalidade por evento* (índice médio, % fatal):
+corredores de alto volume e baixa letalidade, trechos raros porém letais, e grupos
+intermediário/benigno.
 
-**Perfis de acidentes encontrados.** Os grupos combinam janela temporal (hora circular,
-fim de semana), tipo de pista, uso do solo, causa predominante e meteorologia. O grupo
-de maior severidade observada (desfecho retido) é o **Cluster 2**
-(índice médio 5.2, 9.5% fatais).
+**Grupo claramente mais crítico.** O **Cluster 2**
+(87.8% de acidentes fatais em média, 4,410 mortos)
+reúne trechos de baixíssimo volume mas letalidade extrema — invisíveis num ranking por
+frequência. Confirma o insight da EDA de que **volume ≠ gravidade**.
 
-**Existem grupos claramente mais críticos?** Sim — em ambos os níveis há grupos
-destacados: trechos de alta letalidade e contextos de acidente associados a desfechos
-mais graves. Isso é associação contexto→severidade, **não relação causal**.
+**Como orientar recomendações de investimento.**
+- *Trechos raros e letais* → **intervenções pontuais de engenharia/sinalização**, de alto
+  retorno em vidas.
+- *Corredores de alto volume* → **fiscalização, capacidade e fluidez** (concentram feridos
+  por exposição, não por gravidade intrínseca).
+- *Trechos benignos* → baixa prioridade.
 
-**Como orientar recomendações de investimento.** Os trechos de alta letalidade (mesmo
-com baixo volume) sugerem intervenções de engenharia/sinalização pontuais de alto retorno
-em vidas; os de alto volume sugerem fiscalização e capacidade. Os perfis de acidentes
-indicam quando/onde concentrar fiscalização e campanhas (turno, fim de semana, causa,
-condição da via) — a ser quantificado na etapa seguinte de ML supervisionado.
+A quantificação do efeito de cada fator fica para a etapa de ML supervisionado. As leituras
+aqui são associativas, **não causais**.
+
+## 5. Clusterização de Acidentes — investigada e não incluída
+
+A clusterização de acidentes foi testada, mas **não produziu perfis multivariados
+nítidos** e por isso não compõe a entrega (fica documentada aqui).
+
+- **Sem cotovelo** (com todas as features): a inertia cai de forma suave e linear
+  (88.781 → 82.787 → 77.421 → 73.826…), sem inflexão.
+- **Silhouette ≈ 0,13–0,17** (abaixo de 0,25) e **PCA 2D explica só ~28%** da variância —
+  os acidentes não se separam em grupos compactos.
+- **Reduzir features** (temporal + via + causa) elevou o Silhouette para ~0,27, mas os
+  grupos resultantes **apenas redescobrem a `tipo_pista`**: em K=3, os clusters têm
+  exatamente 70.020 / 61.512 / 14.153 registros — os tamanhos de Simples / Dupla /
+  Múltipla. Não são arquétipos novos; é uma única variável categórica dominante.
+
+**Conclusão.** Os acidentes variam num **continuum** estruturado sobretudo pela
+`tipo_pista` — e pista **Simples** concentra severidade (índice ~5,2; ~9,9% fatais) vs
+Dupla (~3,7; ~4,8%) e Múltipla (~3,5; ~4,0%). Isso **confirma a EDA**, não revela perfis
+inéditos. Parte do efeito é metodológica (KMeans euclidiano é fraco em dados
+majoritariamente one-hot); um método nativo para categóricos (K-prototypes) tenderia a
+recuperar a mesma partição. O conhecimento sobre contexto → severidade dos acidentes é
+melhor explorado pela EDA Analytics e pela etapa de ML supervisionado.
 
 ## 6. Metodologia e Limitações
 
-**Pré-processamento.**
-- *Trechos:* `log1p` em `qtd_acidentes` e `indice_gravidade_total` (cauda longa);
-  `indice_gravidade_medio` e `pct_acidentes_fatais` mantidos (skew baixo / massa em 0);
-  `StandardScaler` nas 4. Decisão do usuário: severidade agregada é **descritor de
-  perfil do trecho**, não desfecho a prever — por isso entra na formação.
-- *Acidentes:* `hora` em sin/cos cíclico; `veiculos` em `log1p`+MinMax; categóricas em
-  one-hot com colapso de níveis raros (meteorologia → 4; causa → top-8 + Outros);
-  flags `tem_*` mantidas só com prevalência ≥ ~3%. One-hot/booleanos **não** são
-  padronizados (z-score explodiria dummies raras); peso de bloco (÷√nº de colunas)
-  equilibra a contribuição de cada grupo conceitual.
-- *Vazamento:* nenhuma variável de desfecho entra na matriz de acidentes (assert no
-  pré-processamento); `indice_gravidade`, `fatal`, `classe_gravidade`, `mortos`, etc.
-  são usados apenas para caracterizar os grupos.
+**Pré-processamento (trechos).** `log1p` em `qtd_acidentes` e `indice_gravidade_total`
+(cauda longa); `indice_gravidade_medio` e `pct_acidentes_fatais` mantidos (skew baixo /
+massa em 0); `StandardScaler` nas 4. A severidade agregada é tratada como **descritor de
+perfil do trecho** (não desfecho de um evento a prever), por isso entra na formação —
+conforme o enunciado.
 
-**Limitações.** O KMeans assume geometria euclidiana e clusters convexos/isotrópicos,
-o que é apenas aproximado em dados mistos com muitos one-hot (distância euclidiana em
-colunas 0/1 ≈ Hamming escalado). Alternativas mais adequadas — **K-prototypes** (nativo
-para misto), **Gower + Agglomerative/HDBSCAN** — ficam para iterações futuras (custo
-O(n²) exige amostragem em 145k linhas). A arquitetura já isola a troca de algoritmo em
-`cluster.fit_cluster(X, algo, k)`. Interpretações são associativas, não causais.
+**Algoritmo.** K-Means (`n_init=10`, `random_state` fixo). A arquitetura isola a troca de
+algoritmo em `cluster.fit_cluster(X, algo, k)`, permitindo Agglomerative/DBSCAN sem mexer
+no pré-processamento.
+
+**Limitações.** Interpretações são associativas, não causais. `pct_acidentes_fatais` é
+ruidoso em trechos de 1 acidente (0% ou 100%). O índice de gravidade depende dos pesos
+(12/6/2). Janela temporal curta (2024–2025).

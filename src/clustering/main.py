@@ -1,6 +1,8 @@
 """Orquestração da etapa de Clusterização.
 
-Executa as duas análises independentes (trechos e acidentes) e consolida o relatório.
+Executa a clusterização de trechos rodoviários e consolida o relatório. A clusterização
+de acidentes foi investigada e não incluída como entrega (ver relatório/README): o KMeans
+não formou perfis multivariados nítidos, apenas redescobre `tipo_pista`.
 
 Execução:
     python -m src.clustering.main
@@ -10,7 +12,7 @@ from __future__ import annotations
 
 import logging
 
-from src.clustering import acidentes, report, trechos
+from src.clustering import report, trechos
 
 logger = logging.getLogger("clustering")
 
@@ -24,13 +26,12 @@ def _setup_logging() -> None:
 
 
 def run() -> None:
-    """Executa a clusterização completa: trechos + acidentes + relatório."""
+    """Executa a clusterização de trechos e gera o relatório consolidado."""
     _setup_logging()
     logger.info("=== Início da Clusterização — Acidentes PRF ===")
 
     trechos_result = trechos.run()
-    acidentes_result = acidentes.run()
-    report.report(trechos_result, acidentes_result)
+    report.report(trechos_result)
 
     logger.info("=== Clusterização concluída — artefatos em outputs/clustering/ ===")
 
