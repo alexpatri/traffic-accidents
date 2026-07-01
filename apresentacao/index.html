@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Acidentes nas Rodovias Federais — Perfis de Risco e Priorização</title>
+<style>
+  :root{
+    --bg:#14181d; --bg2:#1b2027; --panel:#1e242c; --panel2:#232b34;
+    --ink:#e8eaed; --muted:#9aa0a6; --faint:#6b7480;
+    --accent:#e5484d; --accent2:#f2994a; --steel:#6b7f95; --steel2:#3b6ea5;
+    --grid:#2a3038; --line:#39424d;
+    --sev0:#f2c94c; --sev1:#f2994a; --sev2:#eb5757; --sev3:#b2182b;
+    --ok:#3f9d6d;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%,#1d242d 0%,var(--bg) 55%) fixed,var(--bg);
+    color:var(--ink);font-family:var(--font);overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* ---------- deck / slides ---------- */
+  #deck{position:fixed;inset:0}
+  .slide{
+    position:absolute;inset:0;display:none;
+    padding:4.2vh 5vw 6.5vh;flex-direction:column;
+    opacity:0;transition:opacity .45s ease;
+  }
+  .slide.active{display:flex;opacity:1}
+  .slide.active .anim{animation:rise .55s cubic-bezier(.2,.7,.2,1) both}
+  .slide.active .anim.d1{animation-delay:.08s}
+  .slide.active .anim.d2{animation-delay:.16s}
+  .slide.active .anim.d3{animation-delay:.24s}
+  .slide.active .anim.d4{animation-delay:.32s}
+  @keyframes rise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+
+  .eyebrow{
+    font-size:1.05vh;letter-spacing:.32em;text-transform:uppercase;
+    color:var(--accent);font-weight:700;margin-bottom:1.4vh;display:flex;gap:.9em;align-items:center;
+  }
+  .eyebrow::before{content:"";width:2.4vw;height:2px;background:var(--accent);display:inline-block}
+  h1{font-size:5.2vh;line-height:1.05;font-weight:800;letter-spacing:-.02em}
+  h2{font-size:3.5vh;line-height:1.08;font-weight:800;letter-spacing:-.015em;margin-bottom:.4vh}
+  .sub{color:var(--muted);font-size:1.9vh;font-weight:400;margin-top:1.1vh;max-width:60ch;line-height:1.45}
+  .slide-body{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;margin-top:2.2vh}
+
+  /* ---------- chrome ---------- */
+  #progress{position:fixed;top:0;left:0;height:3px;background:var(--accent);width:0;z-index:50;transition:width .35s ease}
+  #counter{position:fixed;bottom:2.4vh;right:3vw;color:var(--faint);font-size:1.5vh;font-variant-numeric:tabular-nums;z-index:40}
+  #counter b{color:var(--ink)}
+  #dots{position:fixed;bottom:2.4vh;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:40}
+  #dots button{width:8px;height:8px;border-radius:50%;border:0;background:var(--line);cursor:pointer;padding:0;transition:all .25s}
+  #dots button.on{background:var(--accent);width:20px;border-radius:5px}
+  #brand{position:fixed;bottom:2.4vh;left:3vw;color:var(--faint);font-size:1.35vh;letter-spacing:.12em;text-transform:uppercase;z-index:40}
+  .hint{position:fixed;bottom:6vh;right:3vw;color:var(--faint);font-size:1.2vh;z-index:40;opacity:.7}
+
+  /* ---------- KPI ---------- */
+  .kpi-row{display:flex;gap:2.4vw;flex-wrap:wrap}
+  .kpi{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);
+    border-radius:14px;padding:2.6vh 2.4vw;min-width:16vw;position:relative;overflow:hidden}
+  .kpi::after{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent)}
+  .kpi .num{font-size:5.2vh;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .kpi .lbl{color:var(--muted);font-size:1.55vh;margin-top:1vh;line-height:1.3}
+  .kpi .num.warn{color:var(--accent)}
+  .kpi .num.amber{color:var(--accent2)}
+
+  /* ---------- generic panels / grids ---------- */
+  .cols{display:flex;gap:2.2vw;flex:1;min-height:0}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:1.8vw;flex:1;min-height:0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:2vh 1.6vw;
+    display:flex;flex-direction:column;min-height:0}
+  .card h3{font-size:1.7vh;font-weight:700;margin-bottom:.4vh;color:var(--ink)}
+  .card .cap{color:var(--muted);font-size:1.3vh;margin-bottom:1vh}
+  .chart{flex:1;min-height:0;width:100%}
+  .chart svg{width:100%;height:100%;display:block;overflow:visible}
+
+  /* svg text defaults */
+  svg text{font-family:var(--font)}
+  .ax{fill:var(--muted);font-size:12px}
+  .axlab{fill:var(--faint);font-size:11px;letter-spacing:.05em}
+  .val{fill:var(--ink);font-size:12px;font-weight:700}
+  .gridline{stroke:var(--grid);stroke-width:1}
+  .bar{transform-origin:bottom;animation:grow .7s cubic-bezier(.2,.7,.2,1) both}
+  @keyframes grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+  .barh{transform-origin:left;animation:growx .7s cubic-bezier(.2,.7,.2,1) both}
+  @keyframes growx{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  .draw{stroke-dasharray:2000;stroke-dashoffset:2000;animation:dash 1.2s ease forwards}
+  @keyframes dash{to{stroke-dashoffset:0}}
+  .pop{animation:pop .5s cubic-bezier(.2,.9,.2,1.2) both}
+  @keyframes pop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
+
+  /* ---------- title slide ---------- */
+  #s0{justify-content:center}
+  #s0 .kicker{color:var(--accent);letter-spacing:.34em;text-transform:uppercase;font-weight:700;font-size:1.4vh;margin-bottom:2.2vh}
+  #s0 h1{font-size:6.6vh;max-width:22ch}
+  #s0 .lead{color:var(--muted);font-size:2.2vh;margin-top:2.4vh;max-width:60ch;line-height:1.5}
+  #s0 .authors{margin-top:5vh;display:flex;gap:3vw;color:var(--faint);font-size:1.6vh}
+  #s0 .authors b{color:var(--ink);font-weight:600;display:block;font-size:1.9vh}
+  .stripe{position:absolute;left:0;right:0;bottom:0;height:8px;background:linear-gradient(90deg,var(--sev0),var(--sev1),var(--sev2),var(--sev3))}
+
+  /* ---------- question slide ---------- */
+  #s3{justify-content:center;align-items:flex-start;text-align:left}
+  .qmark{font-size:16vh;line-height:.7;color:var(--line);font-weight:900}
+  .bigq{font-size:6vh;font-weight:800;line-height:1.08;max-width:20ch;letter-spacing:-.02em}
+  .bigq .hl{color:var(--accent)}
+  #s3 .sub{font-size:2.4vh;margin-top:3vh}
+
+  /* ---------- hypothesis cards ---------- */
+  .factors{display:grid;grid-template-columns:repeat(5,1fr);gap:1vw;align-items:stretch}
+  .factor{background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);
+    border-radius:11px;padding:1.8vh 1vw 1.9vh;display:flex;flex-direction:column;gap:.65vh;position:relative}
+  .factor .tag{font-size:1.25vh;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  .factor .ttl{font-size:2.2vh;font-weight:800;line-height:1.1}
+  .factor .desc{font-size:1.75vh;color:var(--muted);line-height:1.38}
+  .factor .idx{position:absolute;top:1.1vh;right:.9vw;font-size:1.55vh;color:var(--line);font-weight:800}
+  .hyp{margin-top:6vh;font-size:3.2vh;line-height:1.42;max-width:72ch;text-align:center;margin-left:auto;margin-right:auto}
+  .hyp .lead{display:block;color:var(--accent);font-weight:800;text-transform:uppercase;letter-spacing:.14em;font-size:1.5vh;margin-bottom:1.3vh}
+  .hyp b{color:var(--accent)}
+
+  /* ---------- architecture diagram ---------- */
+  .arch{flex:1;display:flex;flex-direction:column;justify-content:center;gap:3vh}
+  .arch-row{display:flex;align-items:stretch;gap:0;justify-content:center;flex-wrap:nowrap}
+  .node{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:2.3vh 1.2vw;
+    text-align:center;width:17vw;min-height:16vh;display:flex;flex-direction:column;justify-content:center;position:relative}
+  .node .nt{font-size:2.45vh;font-weight:800}
+  .node .nd{font-size:1.75vh;color:var(--muted);margin-top:.9vh;line-height:1.35}
+  .node.store{border-color:rgba(59,110,165,.5);background:linear-gradient(180deg,#1b2530,var(--bg2))}
+  .node.store .nt{color:#7fb0e0}
+  .node.learn{border-color:rgba(229,72,77,.45);background:linear-gradient(180deg,#241a1c,var(--bg2))}
+  .node.learn .nt{color:var(--accent)}
+  .arrow{display:flex;align-items:center;color:var(--faint);font-size:2.6vh;padding:0 .5vw;font-weight:300}
+  .arch-caption{text-align:center;color:var(--muted);font-size:1.5vh}
+  .stackbar{display:flex;gap:1.4vw;justify-content:center;flex-wrap:wrap;margin-top:1.4vh}
+  .chiptech{border:1px solid var(--line);border-radius:999px;padding:1vh 1.5vw;font-size:1.7vh;color:var(--muted);background:var(--panel)}
+  .chiptech b{color:var(--ink)}
+
+  /* ---------- pipeline stepper ---------- */
+  .stepper{display:flex;gap:0;align-items:stretch;margin-bottom:2vh}
+  .step{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:1.8vh 1.1vw;margin-right:.6vw;position:relative}
+  .step:last-child{margin-right:0}
+  .step .sn{font-size:1.55vh;color:var(--accent);font-weight:800;letter-spacing:.15em}
+  .step .st{font-size:2.25vh;font-weight:800;margin-top:.5vh}
+  .step .sd{font-size:1.75vh;color:var(--muted);margin-top:.6vh;line-height:1.4}
+
+  .formula{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:2.1vh 1.7vw;font-size:2.3vh;line-height:1.62}
+  .formula code{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:.2vh .5vw;color:var(--sev0);font-family:ui-monospace,Menlo,monospace;font-size:2vh}
+  .formula b{color:var(--accent)}
+  #s6 .card h3{font-size:2.25vh}
+  #s6 .card .cap{font-size:1.75vh}
+
+  /* ---------- clusters ---------- */
+  .cluster-cards{display:grid;grid-template-columns:1fr;gap:1.6vh;flex:1;align-content:center}
+  .ccard{background:var(--panel);border:1px solid var(--line);border-left-width:6px;border-radius:11px;padding:1.9vh 1.5vw}
+  .ccard .ch{display:flex;justify-content:space-between;align-items:baseline}
+  .ccard .cn{font-size:2.2vh;font-weight:800}
+  .ccard .cpct{font-size:1.9vh;color:var(--muted);font-variant-numeric:tabular-nums}
+  .ccard .cm{font-size:1.65vh;color:var(--muted);margin-top:.8vh;line-height:1.42}
+  .ccard.crit{border-color:var(--accent);background:linear-gradient(180deg,#241a1c,var(--panel))}
+  .ccard.crit .cn{color:var(--accent)}
+
+  /* ---------- conclusion ---------- */
+  .concl{display:grid;grid-template-columns:1fr 1fr;gap:2vw;flex:1;min-height:0;margin-top:1vh}
+  .cbox{position:relative;background:linear-gradient(180deg,var(--panel),var(--bg2));border:1px solid var(--line);border-radius:16px;padding:2.6vh 1.9vw 2.1vh;display:flex;flex-direction:column;overflow:hidden}
+  .cbox::before{content:"";position:absolute;left:0;right:0;top:0;height:4px}
+  .cbox.a::before{background:linear-gradient(90deg,var(--steel2),#8fbceb)}
+  .cbox.b::before{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .cbox-tag{align-self:flex-start;font-size:1.2vh;letter-spacing:.16em;text-transform:uppercase;font-weight:800;padding:.6vh 1vw;border-radius:999px;margin-bottom:1.4vh}
+  .cbox.a .cbox-tag{color:#8fbceb;background:rgba(59,110,165,.15);border:1px solid rgba(59,110,165,.45)}
+  .cbox.b .cbox-tag{color:var(--accent2);background:rgba(229,72,77,.12);border:1px solid rgba(229,72,77,.45)}
+  .cbox h3{font-size:2.55vh;font-weight:800;line-height:1.1}
+  .cbox .desc{color:var(--muted);font-size:1.6vh;margin-top:.7vh;margin-bottom:1.8vh}
+  .rr{display:grid;grid-template-columns:5vw 1fr auto;align-items:center;gap:.9vw;padding:.72vh 0}
+  .rr-br{font-weight:800;font-size:1.8vh;font-variant-numeric:tabular-nums}
+  .rr-track{height:10px;background:var(--grid);border-radius:6px;overflow:hidden}
+  .rr-track i{display:block;height:100%;border-radius:6px;transform-origin:left;animation:growx .8s cubic-bezier(.2,.7,.2,1) both}
+  .cbox.a .rr-track i{background:linear-gradient(90deg,var(--steel2),#8fbceb)}
+  .cbox.b .rr-track i{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+  .rr-v{font-size:1.55vh;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .rr-v b{color:var(--ink)}
+  .rr-more{font-size:1.45vh;color:var(--faint);padding-top:1vh}
+  .cbox-actions{margin-top:auto;padding-top:1.9vh;border-top:1px solid var(--grid)}
+  .cbox-actions .k{display:block;font-size:1.25vh;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:700;margin-bottom:1.1vh}
+  .chips{display:flex;flex-wrap:wrap;gap:.7vh .6vw}
+  .chip{border:1px solid var(--line);border-radius:999px;padding:.75vh 1.1vw;font-size:1.45vh;background:var(--bg2);color:var(--ink)}
+  .chip.a{border-color:rgba(229,72,77,.5);color:#ff9a9d}
+  .chip.b{border-color:rgba(242,153,74,.5);color:var(--accent2)}
+  .chip.c{border-color:rgba(59,110,165,.5);color:#8fbceb}
+
+  /* ---------- final ---------- */
+  #s12{justify-content:center}
+  .final-cols{display:flex;gap:3.4vw;align-items:center;margin-top:2vh}
+  .final-left{flex:1.5;min-width:0}
+  .final-right{flex:1;display:flex;flex-direction:column;align-items:center;gap:1.8vh}
+  .final-right .chart{flex:none;width:100%;height:50vh}
+  .impact-cap{text-align:center;color:var(--muted);font-size:1.9vh;line-height:1.45;max-width:30ch}
+  .impact-cap b{color:var(--accent);font-weight:800}
+  #s12 .answer{font-size:3.6vh;font-weight:800;line-height:1.22;max-width:26ch}
+  #s12 .answer .hl{color:var(--accent)}
+  .ans-list{margin-top:2.6vh;display:flex;flex-direction:column;gap:1.5vh}
+  .ans-item{display:flex;gap:1.1vw;align-items:flex-start;font-size:2.05vh;line-height:1.4}
+  .ans-item .an{color:var(--accent);font-weight:800;font-size:2.25vh;min-width:1.4vw}
+  .ans-item .muted{color:var(--muted)}
+  .caveat{margin-top:2.8vh;color:var(--faint);font-size:1.6vh;border-top:1px solid var(--grid);padding-top:1.6vh;line-height:1.5}
+
+  .legend{display:flex;gap:1.2vw;flex-wrap:wrap;margin-top:.8vh}
+  .legend span{display:flex;align-items:center;gap:.4vw;font-size:1.3vh;color:var(--muted)}
+  .legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+
+  .takeaway{margin-top:1.6vh;background:var(--panel2);border-left:4px solid var(--accent);border-radius:0 10px 10px 0;
+    padding:1.4vh 1.4vw;font-size:1.65vh;line-height:1.4}
+  .takeaway b{color:var(--accent)}
+
+  /* ---------- impressão / export PDF ---------- */
+  @page{size:1280px 720px;margin:0}
+  @media print{
+    #progress,#dots,#counter,#brand,.hint{display:none !important}
+    html,body{overflow:visible !important;height:auto !important;background:#14181d !important;
+      -webkit-print-color-adjust:exact;print-color-adjust:exact}
+    #deck{position:static !important;inset:auto !important;height:auto !important}
+    .slide{position:relative !important;display:flex !important;opacity:1 !important;inset:auto !important;
+      width:1280px !important;height:720px !important;page-break-after:always;break-after:page;overflow:hidden}
+    .slide:last-child{page-break-after:auto;break-after:auto}
+    .slide,.slide *{animation:none !important}
+    .draw{stroke-dashoffset:0 !important}
+    .bar,.barh,.rr-track i{transform:none !important}
+  }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<div id="brand">PRF · 2024–2026</div>
+<div id="counter"><b id="cnum">1</b> / <span id="ctot">13</span></div>
+<div id="dots"></div>
+
+<div id="deck">
+
+  <!-- 0 — CAPA -->
+  <section class="slide" id="s0">
+    <div class="kicker anim">Ciência de Dados aplicada à Segurança Viária</div>
+    <h1 class="anim d1">Acidentes nas Rodovias Federais</h1>
+    <div class="lead anim d2">Perfis de risco e priorização de investimentos na malha rodoviária federal — dos dados brutos da PRF à decisão de onde investir para salvar vidas.</div>
+    <div class="authors anim d3">
+      <div><b>Alexsandro Júnior</b></div>
+      <div><b>Kaio Matozo</b></div>
+      <div><b>Maria Eduarda Jardim</b></div>
+    </div>
+    <div class="stripe"></div>
+  </section>
+
+  <!-- 1 — DIMENSÃO DO PROBLEMA -->
+  <section class="slide" id="s1">
+    <div class="eyebrow anim">O problema</div>
+    <h2 class="anim">A cada ano, um número que não cede</h2>
+    <div class="sub anim d1">Boletins da PRF em rodovias federais. Em anos fechados o patamar se mantém — e na mesma janela (jan–mai), 2026 já supera 2024 e 2025.</div>
+    <div class="slide-body">
+      <div class="kpi-row anim d2" style="margin-bottom:2.2vh">
+        <div class="kpi"><div class="num" data-count="145685">0</div><div class="lbl">acidentes registrados<br>em 2024 + 2025</div></div>
+        <div class="kpi"><div class="num warn" data-count="12203">0</div><div class="lbl">mortes em 2024 + 2025<br>nas rodovias federais</div></div>
+        <div class="kpi"><div class="num amber" data-count="17">0</div><div class="lbl">mortes por dia,<br>em média, na malha federal</div></div>
+      </div>
+      <div class="cols" style="flex:1">
+        <div class="card anim d3" style="flex:1">
+          <h3>Ano completo · 2024 vs 2025</h3>
+          <div class="cap">Anos fechados: leve queda, mesmo patamar de gravidade</div>
+          <div class="chart" id="c_anofull"></div>
+        </div>
+        <div class="card anim d3" style="flex:1.4">
+          <h3>Mesma janela · janeiro a maio</h3>
+          <div class="cap">Comparação justa dos três anos (2026 vai até maio) — o pior do período</div>
+          <div class="chart" id="c_janmai"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 — A PERGUNTA -->
+  <section class="slide" id="s3">
+    <div class="qmark anim">?</div>
+    <div class="bigq anim d1">Onde e como <span class="hl">investir</span> para salvar mais vidas na malha federal?</div>
+    <div class="sub anim d2">Recurso é finito. Não basta contar acidentes — é preciso distinguir <b style="color:var(--ink)">volume</b> de <b style="color:var(--ink)">gravidade</b> e agir onde cada real rende mais vidas.</div>
+  </section>
+
+  <!-- 4 — HIPÓTESE -->
+  <section class="slide" id="s4">
+    <div class="eyebrow anim">Hipótese</div>
+    <h2 class="anim">O risco se concentra — e é explicável</h2>
+    <div class="sub anim d1">Antes de modelar, formulamos quais fatores deveriam governar a gravidade de um trecho.</div>
+    <div class="slide-body">
+      <div class="factors anim d2">
+        <div class="factor"><span class="idx">01</span><span class="tag">Infraestrutura</span><span class="ttl">Tipo de pista</span><span class="desc">Simples vs. dupla/múltipla — exposição a colisão frontal.</span></div>
+        <div class="factor"><span class="idx">02</span><span class="tag">Geometria</span><span class="ttl">Traçado da via</span><span class="desc">Curvas, declives, interseções e pontes.</span></div>
+        <div class="factor"><span class="idx">03</span><span class="tag">Ambiente</span><span class="ttl">Período / iluminação</span><span class="desc">Noite e transições (amanhecer/anoitecer).</span></div>
+        <div class="factor"><span class="idx">04</span><span class="tag">Comportamento</span><span class="ttl">Causa do acidente</span><span class="desc">Velocidade, distância, reação, álcool.</span></div>
+        <div class="factor"><span class="idx">05</span><span class="tag">Espaço</span><span class="ttl">Concentração espacial</span><span class="desc">Poucos trechos respondem por muitas mortes.</span></div>
+      </div>
+      <div class="hyp anim d3"><span class="lead">Hipótese central</span>O risco <b>não está espalhado uniformemente</b>: concentra-se em poucos trechos e pode ser explicado por características da via somadas ao contexto.</div>
+    </div>
+  </section>
+
+  <!-- 5 — ARQUITETURA -->
+  <section class="slide" id="s5">
+    <div class="eyebrow anim">Como construímos</div>
+    <h2 class="anim">Arquitetura lógica do trabalho</h2>
+    <div class="sub anim d1">Um pipeline reprodutível: das fontes brutas às camadas analíticas e aos modelos.</div>
+    <div class="slide-body">
+      <div class="arch">
+        <div class="arch-row anim d2">
+          <div class="node"><div class="nt">Fontes</div><div class="nd">CSV PRF<br>2024 · 2025 · 2026</div></div>
+          <div class="arrow">&rarr;</div>
+          <div class="node"><div class="nt">Pipeline Polars</div><div class="nd">Extract · Transform · Load<br>limpeza · tipagem · validação</div></div>
+          <div class="arrow">&rarr;</div>
+          <div class="node store"><div class="nt">Camada Trusted</div><div class="nd">parquet · zstd<br>base única 2024–26</div></div>
+          <div class="arrow">&rarr;</div>
+          <div class="node"><div class="nt">Feature Engineering</div><div class="nd">índice de gravidade<br>trecho · flags de traçado</div></div>
+        </div>
+        <div class="arch-row anim d3">
+          <div class="node store"><div class="nt">Camada Analytics</div><div class="nd">parquet<br>acidentes + trechos</div></div>
+          <div class="arrow">&rarr;</div>
+          <div class="node learn"><div class="nt">Clusterização</div><div class="nd">KMeans · perfis de trecho<br>não supervisionado</div></div>
+          <div class="arrow">&rarr;</div>
+          <div class="node"><div class="nt">Priorização</div><div class="nd">vias · trechos<br>propostas de intervenção</div></div>
+        </div>
+        <div class="stackbar anim d4">
+          <span class="chiptech"><b>Python 3.13</b></span>
+          <span class="chiptech"><b>Polars</b> · ETL & agregações</span>
+          <span class="chiptech"><b>scikit-learn</b> · KMeans (clusterização)</span>
+          <span class="chiptech"><b>Matplotlib</b> · figuras</span>
+          <span class="chiptech"><b>Parquet</b> · armazenamento colunar</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 — PIPELINE DE DADOS -->
+  <section class="slide" id="s6">
+    <div class="eyebrow anim">Pipeline de dados</div>
+    <h2 class="anim">Da matéria-bruta ao dado analítico</h2>
+    <div class="sub anim d1">Quatro passos encadeados — cada um deixa o dado mais próximo da decisão.</div>
+    <div class="slide-body">
+      <div class="stepper anim d2">
+        <div class="step"><div class="sn">01 · ETL</div><div class="st">Tratamento</div><div class="sd">Latin-1 → UTF-8, tipagem, datas/horas, deduplicação e validação. Grava a camada Trusted.</div></div>
+        <div class="step"><div class="sn">02 · EDA</div><div class="st">Exploração</div><div class="sd">Distribuições por hora, fase do dia, pista e causa — as evidências dos padrões.</div></div>
+        <div class="step"><div class="sn">03 · FE</div><div class="st">Feature Engineering</div><div class="sd">Índice de gravidade, identidade de trecho, flags de traçado, turno e agregações.</div></div>
+        <div class="step"><div class="sn">04 · EDA</div><div class="st">EDA Analytics</div><div class="sd">Reexame já com as novas variáveis: valida a separação de severidade.</div></div>
+      </div>
+      <div class="cols" style="flex:1">
+        <div class="card anim d3" style="flex:1.15;justify-content:center">
+          <div class="formula">
+            <b>Índice de gravidade</b> (peso por vítima):<br>
+            <code>12 × mortos + 6 × feridos graves + 2 × feridos leves</code><br><br>
+            <b>Trecho</b> = <code>UF _ BR _ faixa de km</code> &nbsp;(segmentação da via)<br><br>
+            <b>Flags de traçado</b>: reta · curva · declive · interseção · ponte · túnel — derivadas do campo textual.
+          </div>
+        </div>
+        <div class="card anim d4" style="flex:1">
+          <h3>Distribuição por classe de gravidade</h3>
+          <div class="cap">O índice separa bem — poucos acidentes concentram a severidade</div>
+          <div class="chart" id="c_classe"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EDA — O RISCO NÃO É ALEATÓRIO -->
+  <section class="slide" id="s2">
+    <div class="eyebrow anim">EDA · o que os dados revelam</div>
+    <h2 class="anim">O risco não é aleatório</h2>
+    <div class="sub anim d1">Com a base tratada, a exploração confirma parte da hipótese: quando, onde e em que tipo de via os acidentes se tornam fatais.</div>
+    <div class="slide-body">
+      <div class="grid3 anim d2">
+        <div class="card"><h3>Acidentes e gravidade por hora</h3><div class="cap">Volume pico às 18h; gravidade média maior de madrugada</div><div class="chart" id="c_hora"></div></div>
+        <div class="card"><h3>% de acidentes fatais por fase do dia</h3><div class="cap">A noite é desproporcionalmente letal</div><div class="chart" id="c_fase"></div></div>
+        <div class="card"><h3>% de acidentes fatais por tipo de pista</h3><div class="cap">Pista simples: o dobro da pista dupla</div><div class="chart" id="c_pista"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 — CONCENTRAÇÃO (PARETO) -->
+  <section class="slide" id="s7">
+    <div class="eyebrow anim">Evidência-chave</div>
+    <h2 class="anim">O risco é concentrado</h2>
+    <div class="sub anim d1">Se poucos trechos concentram a maior parte da gravidade, a priorização deixa de ser opinião e vira aritmética.</div>
+    <div class="slide-body">
+      <div class="cols">
+        <div class="card anim d2" style="flex:1.6">
+          <h3>Curva de concentração — gravidade acumulada por trecho</h3>
+          <div class="cap">Trechos ordenados do mais grave ao menos grave (33.024 trechos)</div>
+          <div class="chart" id="c_pareto"></div>
+        </div>
+        <div class="card anim d3" style="flex:1;justify-content:center;gap:2.6vh">
+          <div>
+            <div style="font-size:6vh;font-weight:800;color:var(--accent);line-height:1">44,7%</div>
+            <div class="cap" style="font-size:1.6vh">da gravidade total está em apenas <b style="color:var(--ink)">10%</b> dos trechos</div>
+          </div>
+          <div>
+            <div style="font-size:6vh;font-weight:800;line-height:1">80%</div>
+            <div class="cap" style="font-size:1.6vh">da gravidade concentra-se em <b style="color:var(--ink)">36%</b> dos trechos</div>
+          </div>
+          <div class="takeaway" style="margin-top:0">Atacar os <b>trechos certos</b> multiplica o impacto de cada real investido.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 — QUANTOS PERFIS -->
+  <section class="slide" id="s8">
+    <div class="eyebrow anim">Clusterização · não supervisionado</div>
+    <h2 class="anim">Quantos perfis de trecho existem?</h2>
+    <div class="sub anim d1">KMeans sobre características dos trechos. O cotovelo e a silhueta convergem — e a interpretabilidade decide.</div>
+    <div class="slide-body">
+      <div class="cols">
+        <div class="card anim d2" style="flex:2">
+          <h3>Método do cotovelo &amp; silhueta (K = 2 a 10)</h3>
+          <div class="cap">Inércia (SSE) cai com retorno decrescente; silhueta favorece grupos compactos</div>
+          <div class="chart" id="c_elbow"></div>
+        </div>
+        <div class="card anim d3" style="flex:1;justify-content:center">
+          <div style="font-size:1.5vh;color:var(--muted);letter-spacing:.15em;text-transform:uppercase;font-weight:700">Escolha</div>
+          <div style="font-size:9vh;font-weight:800;color:var(--accent);line-height:1;margin:1vh 0">K = 4</div>
+          <div class="cap" style="font-size:1.55vh;line-height:1.5">O cotovelo se acentua em K=3–4 e a silhueta é alta; <b style="color:var(--ink)">4 grupos</b> equilibram compactação e leitura de negócio (volume × letalidade).</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 — OS 4 PERFIS -->
+  <section class="slide" id="s9">
+    <div class="eyebrow anim">Clusterização · resultado</div>
+    <h2 class="anim">Quatro perfis — e um grupo crítico</h2>
+    <div class="sub anim d1">Os trechos se organizam em dois eixos: quanto acontece (volume) e quão grave é (letalidade).</div>
+    <div class="slide-body">
+      <div class="cols">
+        <div class="card anim d2" style="flex:1.2">
+          <h3>Clusters de trechos · projeção PCA 2D</h3>
+          <div class="cap">87,3% da variância; × marca os centróides de cada grupo</div>
+          <div class="chart" id="c_scatter"></div>
+        </div>
+        <div class="cluster-cards anim d3" style="flex:1">
+          <div class="ccard" style="border-left-color:var(--sev1)">
+            <div class="ch"><span class="cn">Médio / Médio</span><span class="cpct">36,9%</span></div>
+            <div class="cm">Volume e gravidade intermediários — a malha "comum".</div>
+          </div>
+          <div class="ccard" style="border-left-color:var(--steel2)">
+            <div class="ch"><span class="cn">Alto volume</span><span class="cpct">14,2%</span></div>
+            <div class="cm">~17,6 acidentes por trecho; corredores movimentados.</div>
+          </div>
+          <div class="ccard crit">
+            <div class="ch"><span class="cn">Crítico</span><span class="cpct">8,9%</span></div>
+            <div class="cm"><b style="color:var(--accent)">87,8% fatais</b> · baixo volume, altíssima letalidade. <b style="color:var(--ink)">4.410 mortos ≈ 36% do total.</b></div>
+          </div>
+          <div class="ccard" style="border-left-color:var(--faint)">
+            <div class="ch"><span class="cn">Baixo / Baixo</span><span class="cpct">40,0%</span></div>
+            <div class="cm">Sem fatalidades no período — baixa prioridade.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 — CONCLUSÃO -->
+  <section class="slide" id="s11">
+    <div class="eyebrow anim">Conclusão</div>
+    <h2 class="anim">Onde investir — e o quê fazer</h2>
+    <div class="sub anim d1">Dois eixos de risco pedem duas estratégias. As propostas seguem o perfil observado de cada via.</div>
+    <div class="slide-body">
+      <div class="concl">
+        <div class="cbox a anim d2">
+          <span class="cbox-tag">Eixo 1 · Carga</span>
+          <h3>Corredores de alto volume</h3>
+          <div class="desc">Muitos acidentes e muita gravidade absoluta.</div>
+          <div class="rr"><span class="rr-br">BR-116</span><span class="rr-track"><i style="width:100%"></i></span><span class="rr-v"><b>1.529</b> mortos</span></div>
+          <div class="rr"><span class="rr-br">BR-101</span><span class="rr-track"><i style="width:98%"></i></span><span class="rr-v"><b>1.492</b> mortos</span></div>
+          <div class="rr"><span class="rr-br">BR-153</span><span class="rr-track"><i style="width:36%"></i></span><span class="rr-v"><b>552</b> mortos</span></div>
+          <div class="rr-more">+ BR-381 · BR-040 · BR-364 — corredores urbanizados</div>
+          <div class="cbox-actions">
+            <span class="k">Intervenções prioritárias</span>
+            <div class="chips">
+              <span class="chip c">Gestão de tráfego</span>
+              <span class="chip c">Fiscalização de velocidade</span>
+              <span class="chip c">Capacidade nos hotspots</span>
+            </div>
+          </div>
+        </div>
+        <div class="cbox b anim d3">
+          <span class="cbox-tag">Eixo 2 · Letalidade</span>
+          <h3>Pista simples de alta letalidade</h3>
+          <div class="desc">Poucos acidentes, mas altíssima chance de morte.</div>
+          <div class="rr"><span class="rr-br">BR-222</span><span class="rr-track"><i style="width:100%"></i></span><span class="rr-v"><b>17%</b> fatais · 70% simples</span></div>
+          <div class="rr"><span class="rr-br">BR-316</span><span class="rr-track"><i style="width:88%"></i></span><span class="rr-v"><b>15%</b> fatais · 69% simples</span></div>
+          <div class="rr"><span class="rr-br">BR-153</span><span class="rr-track"><i style="width:47%"></i></span><span class="rr-v"><b>8%</b> fatais · 60% simples</span></div>
+          <div class="rr-more">+ BR-262 · BR-163 · BR-158 — perfil de colisão frontal</div>
+          <div class="cbox-actions">
+            <span class="k">Intervenções prioritárias</span>
+            <div class="chips">
+              <span class="chip a">Duplicação + barreira central</span>
+              <span class="chip b">Iluminação</span>
+              <span class="chip b">Radar + faixa de ultrapassagem</span>
+              <span class="chip c">Geometria · travessias · drenagem</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 — FECHO -->
+  <section class="slide" id="s12">
+    <div class="eyebrow anim">A resposta</div>
+    <div class="final-cols">
+      <div class="final-left">
+        <div class="answer anim d1">Investir onde o risco <span class="hl">se concentra</span> — não onde ele apenas <span class="hl">se acumula</span>.</div>
+        <div class="ans-list">
+          <div class="ans-item anim d2"><span class="an">1</span><span><b>Corredores de alto volume</b> (BR-101, BR-116): <span class="muted">gestão de tráfego, fiscalização e capacidade.</span></span></div>
+          <div class="ans-item anim d3"><span class="an">2</span><span><b>Pista simples de alta letalidade</b> (BR-316, BR-153, BR-262, BR-163): <span class="muted">duplicação + barreira + iluminação — maior retorno em vidas.</span></span></div>
+          <div class="ans-item anim d4"><span class="an">3</span><span><b>Trechos pontualmente letais</b> (grupo crítico): <span class="muted">intervenções dirigidas pelo perfil — geometria, radar, travessia, drenagem.</span></span></div>
+        </div>
+        <div class="caveat anim d4">Ressalva: sem <b>volume de tráfego (VMD)</b> e <b>velocidade da via</b>, a priorização fina fica limitada — principal próximo passo. As leituras são associativas, não causais, e apoiam (não substituem) a vistoria de engenharia.</div>
+      </div>
+      <div class="final-right anim d2">
+        <div class="chart" id="c_final"></div>
+        <div class="impact-cap"><b>36% das mortes</b> concentram-se em apenas <b>8,9% dos trechos</b> — o grupo crítico. É aí que o investimento rende mais vidas.</div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+"use strict";
+/* =================== dados =================== */
+const SEV = ["#f2c94c","#f2994a","#eb5757","#b2182b"];
+const C = getComputedStyle(document.documentElement);
+const COL = {
+  ink:"#e8eaed", muted:"#9aa0a6", faint:"#6b7480", accent:"#e5484d",
+  accent2:"#f2994a", steel:"#6b7f95", steel2:"#3b6ea5", grid:"#2a3038", ok:"#3f9d6d"
+};
+
+const DATA = {
+  anoFull:[
+    {ano:"2024", acid:73156, mortos:6160},
+    {ano:"2025", acid:72529, mortos:6043},
+  ],
+  janMai:[
+    {ano:"2024", acid:29013, mortos:2375},
+    {ano:"2025", acid:28657, mortos:2361},
+    {ano:"2026", acid:29774, mortos:2429, hl:true},
+  ],
+  hora:[2966,2664,2371,2601,3131,4330,6370,9179,7492,6101,6126,6279,6214,6322,6917,7366,8182,9678,10892,9489,6804,5579,4812,3820],
+  igHora:[4.68,4.41,4.83,5.07,4.84,5.05,4.52,3.96,3.89,3.86,3.93,4.23,4.12,4.26,4.39,4.33,4.21,4.36,4.59,4.89,4.81,4.81,4.62,4.89],
+  fase:[{l:"Amanhecer",v:11.0},{l:"Plena noite",v:10.1},{l:"Anoitecer",v:6.8},{l:"Pleno dia",v:5.0}],
+  pista:[{l:"Simples",v:9.9},{l:"Dupla",v:4.8},{l:"Múltipla",v:4.0}],
+  classe:[{l:"Baixa",v:83856},{l:"Média",v:44650},{l:"Alta",v:14756},{l:"Crítica",v:2423}],
+  pareto:{x:[0,5,10,20,30,40,50,60,70,80,90,100], cum:[0,30.6,44.7,62.9,74.7,83.1,89.4,93.9,97.0,98.8,99.8,100]},
+  elbow:{k:[2,3,4,5,6,7,8,9,10],
+    sse:[87557,52556,41744,35048,28951,24438,20080,17587,15472],
+    sil:[.411,.481,.407,.410,.435,.428,.437,.430,.467]},
+  pca:{var:[48.8,38.5],cent:[[0.28, 0.25],[1.39, 1.98],[2.43, -2.47],[-1.29, -0.38]],
+    p:[3.31,-2.44,2,1.78,-2.55,2,0.56,1.67,1,-1.44,-0.47,3,-0.68,-0.5,3,-1.02,-0.46,3,-0.68,-0.5,3,1.63,1.73,1,2.45,-2.84,2,1.94,2.64,1,0.83,1.45,1,3.63,-3.5,2,-2.18,-0.64,3,1.07,1.51,1,1.72,-0.46,0,1.88,-0.93,2,1.15,2.33,1,-0.5,0.07,0,3.05,-3.16,2,1.49,-1.08,2,4.72,-4.2,2,0.41,-0.09,0,1.71,1.81,1,1.78,-2.55,2,0.51,1.44,1,2.01,-2.64,2,-0.31,0.44,0,-1.02,-0.46,3,-2.18,-0.64,3,3.21,4.55,1,1.57,-1.45,0,1.78,-2.55,2,1.14,1.57,1,-1.44,-0.47,3,7.3,-6.03,2,1.37,-1.34,0,0.69,-0.87,0,-0.46,0.43,0,8.3,-6.78,2,2.4,-0.84,2,1.01,1.04,1,0.19,0.42,0,-0.5,0.07,0,1.78,-2.55,2,3.05,-3.16,2,-0.02,0.72,0,2.08,0.34,1,12.51,-8.79,2,3.5,0.64,1,1.77,2.26,1,1.73,-1.17,2,-0.04,1.09,0,0.69,-0.87,0,1.06,1.04,1,2.33,-2.0,2,2.42,3.34,1,2.48,0.31,1,1.78,-2.55,2,-0.0,0.02,0,0.69,-0.87,0,0.53,-0.13,0,-0.5,0.07,0,3.11,-2.33,2,-0.04,0.44,0,1.49,-1.08,2,1.78,-2.55,2,1.85,1.69,1,2.27,-1.42,2,1.78,-2.55,2,1.76,-1.56,0,1.49,-1.08,2,-2.18,-0.64,3,-0.15,0.04,0,-0.97,0.04,3,1.78,-2.55,2,1.78,-2.55,2,1.66,0.96,1,2.64,-0.93,2,0.24,1.13,0,1.66,2.03,1,0.56,-0.92,0,0.61,1.31,1,1.61,-1.13,2,3.25,-3.27,2,2.24,-0.05,0,-0.68,-0.5,3,0.53,-0.13,0,2.24,-0.05,0,-0.4,-0.56,3,3.05,-3.16,2,1.49,-1.08,2,-0.58,0.64,0,-0.71,0.07,3,-0.32,0.06,0,3.35,-2.02,2,2.45,-2.84,2,4.18,-3.85,2,1.95,-1.27,2,3.05,-3.16,2,3.25,4.19,1,1.78,-2.55,2,-1.44,-0.47,3,1.78,-2.55,2,3.37,4.74,1,1.95,-0.22,0,-0.16,0.44,0,1.9,1.56,1,0.64,-0.18,0,0.34,1.53,1,0.96,1.8,1,2.65,-2.95,2,1.78,-2.55,2,3.16,-1.91,2,1.78,-2.55,2,1.78,-2.55,2,-0.4,-0.56,3,1.27,1.64,1,1.49,-1.08,2,0.15,1.12,0,1.09,1.22,1,1.52,2.26,1,-1.44,-0.47,3,-0.68,-0.5,3,-2.18,-0.64,3,0.76,0.29,0,3.39,4.73,1,-0.71,0.07,3,-0.4,-0.56,3,1.78,-2.55,2,3.05,-3.16,2,0.86,-0.21,0,-0.16,0.44,0,1.78,-2.55,2,1.43,1.35,1,3.05,-3.16,2,3.16,4.33,1,3.63,-3.5,2,-1.44,-0.47,3,1.78,-2.55,2,-0.45,0.99,0,2.33,-0.08,0,-0.68,-0.5,3,1.78,-2.55,2,2.23,-2.74,2,1.93,2.62,1,4.45,-2.72,2,-0.65,0.4,0,2.13,-1.01,2,1.49,-1.08,2,-1.44,-0.47,3,-0.32,0.06,0,-0.68,-0.5,3,1.63,0.73,1,2.41,-0.28,0,1.78,-2.55,2,0.44,1.64,1,-0.4,-0.56,3,2.61,0.01,0,-0.16,0.44,0,2.16,-1.37,2,2.87,-1.74,2,3.63,-3.5,2,2.01,-2.64,2,2.31,-0.73,2,-0.31,0.44,0,0.77,1.69,1,2.33,-2.0,2,0.67,1.68,1,0.98,-0.93,0,-0.16,1.07,0,1.27,1.21,1,0.82,1.69,1,1.57,-1.45,0,1.1,1.57,1,-1.98,-0.27,3,1.73,-1.17,2,1.78,-2.55,2,1.37,-1.34,0,3.05,-3.16,2,0.14,-0.01,0,2.57,-1.58,2,1.62,2.77,1,2.89,-0.54,2,1.78,-2.55,2,-0.71,0.07,3,1.4,0.48,0,1.05,0.55,0,-1.02,-0.46,3,2.03,2.97,1,1.06,1.57,1,2.94,-0.36,2,-0.26,0.7,0,2.45,-2.84,2,2.14,2.91,1,2.68,-2.13,2,-1.32,-0.03,3,-1.44,-0.47,3,0.67,0.84,0,1.78,-2.55,2,2.72,-0.94,2,-1.02,-0.46,3,0.97,2.3,1,1.78,-2.55,2,1.78,-2.55,2,0.78,1.45,1,3.19,4.29,1,-1.02,-0.46,3,-0.5,0.07,0,1.49,-1.08,2,1.61,-1.13,2,1.78,-2.55,2,-0.97,0.04,3,1.49,-1.08,2,0.92,0.57,0,0.81,0.84,0,3.05,-3.16,2,2.28,-0.49,2,0.86,-0.21,0,3.05,-3.16,2,1.96,2.86,1,-0.4,0.68,0,3.05,-3.16,2,0.9,1.04,1,-0.4,-0.56,3,7.3,-6.03,2,1.17,0.53,0,-0.68,-0.5,3,2.32,-1.0,0,1.78,-2.55,2,-1.44,-0.47,3,0.82,1.69,1,1.6,2.77,1,0.06,1.11,0,1.57,-1.45,0,1.78,-2.55,2,3.2,2.36,1,-0.4,-0.56,3,-2.18,-0.64,3,1.49,-1.08,2,1.64,2.54,1,1.68,2.19,1,2.45,-2.84,2,0.95,-0.23,0,1.78,-2.55,2,1.37,0.13,0,-2.18,-0.64,3,-0.16,0.44,0,-0.68,-0.5,3,1.28,2.29,1,1.96,-0.96,2,1.78,-2.55,2,-1.02,-0.46,3,2.33,-0.08,0,1.73,-1.17,2,2.33,-2.0,2,2.45,-2.84,2,2.2,0.3,1,-0.68,-0.5,3,0.82,1.12,0,2.77,-1.69,2,3.14,4.31,1,3.29,4.24,1,-0.16,0.44,0,2.86,-3.05,2,-1.44,-0.47,3,1.57,-0.4,0,0.65,1.57,1,1.78,-2.55,2,0.11,-0.73,0,-0.97,0.04,3,1.0,1.8,1,2.01,-2.64,2,2.35,0.16,1,0.86,1.7,1,1.09,1.22,1,0.92,1.97,1,-1.32,-0.03,3,-0.4,-0.56,3,0.02,0.94,0,3.44,-3.39,2,3.0,-1.36,2,0.7,1.58,1,-0.02,0.72,0,-0.97,0.04,3,0.85,0.58,0,1.78,-2.55,2,3.25,-3.27,2,1.78,-2.55,2,-0.4,0.68,0,2.1,0.79,1,-1.02,-0.46,3,-2.18,-0.64,3,3.54,-1.69,2,2.01,-2.64,2,-0.32,0.06,0,-0.68,-0.5,3,1.78,-2.55,2,-0.09,0.92,0,1.55,0.96,1,2.55,-0.55,0,1.88,-0.93,2,2.01,-2.64,2,1.78,-2.55,2,1.78,-2.55,2,1.78,-2.55,2,1.78,-2.55,2,4.49,-2.41,2,2.14,3.14,1,1.78,-2.55,2,-1.44,-0.47,3,3.24,4.39,1,1.78,-2.55,2,-1.44,-0.47,3,0.78,1.05,0,1.78,-2.55,2,-0.68,-0.5,3,3.05,-3.16,2,1.85,3.05,1,-1.44,-0.47,3,0.78,0.58,0,1.61,-1.13,2,-0.4,-0.56,3,2.45,-2.84,2,2.01,-2.64,2,1.63,0.14,0,0.95,-0.23,0,3.16,-1.91,2,3.25,-3.27,2,2.01,-2.64,2,3.05,-3.16,2,7.64,-6.28,2,2.45,-2.04,2,0.7,1.58,1,2.16,-1.37,2,7.47,-6.15,2,3.58,4.89,1,2.86,-3.05,2,-0.65,0.4,0,4.72,-4.2,2,8.14,-6.65,2,2.05,2.97,1,2.45,-2.84,2,-0.15,0.04,0,1.71,0.39,0,2.55,0.16,1,-0.4,0.68,0,0.06,1.11,0,3.05,-3.16,2,-0.4,-0.56,3,2.6,-0.2,0,-1.44,-0.47,3,1.84,2.51,1,3.25,-3.27,2,2.02,-0.59,0,1.78,-2.55,2,1.31,1.02,1,-0.65,0.4,0,1.49,-1.08,2,0.21,0.95,0,0.58,0.34,0,1.78,-2.55,2,1.37,-1.34,0,1.78,-2.55,2,2.45,-2.84,2,1.78,-2.55,2,2.58,3.48,1,-1.44,-0.47,3,8.14,-6.65,2,0.78,1.36,1,1.73,-1.17,2,0.91,1.7,1,2.33,-2.0,2,-0.88,0.36,3,-2.18,-0.64,3,-1.44,-0.47,3,0.63,0.59,0,3.0,-2.28,2,1.76,-1.56,0,-0.4,-0.56,3,1.78,-2.55,2,3.63,-3.5,2,2.32,0.26,1,1.2,1.94,1,7.97,-6.53,2,2.62,-0.38,0,-1.44,-0.47,3,0.28,-0.05,0,1.78,-2.55,2,3.05,-3.16,2,2.45,-2.84,2,0.12,0.95,0,3.44,-3.39,2,1.44,1.33,1,-0.16,0.44,0,-0.02,0.72,0,2.65,-2.95,2,3.63,-3.5,2,1.52,2.68,1,1.11,1.8,1,1.58,2.39,1,1.4,1.33,1,3.05,-3.16,2,0.72,1.87,1,1.73,-1.17,2,2.65,-2.95,2,-0.4,-0.56,3,-0.4,-0.56,3,27.87,-22.61,2,1.78,-2.55,2,2.9,-0.34,2,1.97,2.93,1,0.1,1.26,0,0.84,-0.89,0,0.02,0.94,0,2.86,-3.05,2,2.9,-2.23,2,-0.4,-0.56,3,1.78,-2.55,2,1.78,-2.55,2,1.12,-0.96,0,2.01,-2.64,2,1.78,-2.55,2,3.25,-3.27,2,1.78,-2.55,2,-2.18,-0.64,3,2.39,0.15,1,1.02,0.22,0,0.68,1.45,1,1.78,-2.55,2,-2.18,-0.64,3,0.73,1.45,1,1.26,1.02,1,3.05,-3.16,2,-2.18,-0.64,3,1.3,1.01,1,-0.68,-0.5,3,0.94,1.38,1,-1.44,-0.47,3,2.45,-2.84,2,2.23,-2.74,2,2.23,-2.74,2,1.98,1.25,1,1.73,-1.17,2,1.78,-2.55,2,2.01,-2.64,2,0.89,1.58,1,-0.65,0.4,0,-2.18,-0.64,3,3.14,4.09,1,-0.4,-0.56,3,-0.0,0.02,0,2.68,-1.62,2,1.78,-2.55,2,2.01,-2.64,2,2.45,-2.84,2,2.01,-2.64,2,3.21,-2.39,2,-2.18,-0.64,3,2.32,-1.0,0,1.78,-2.55,2,3.35,-2.02,2,0.11,-0.73,0,0.56,-0.92,0,0.66,1.31,1,1.78,-2.55,2,4.09,-2.49,2,2.27,-1.42,2,2.16,-1.37,2,3.81,-3.61,2,3.57,-2.73,2,0.66,-0.17,0,-0.4,-0.56,3,1.44,1.37,1,1.78,-2.55,2,1.78,-2.55,2,1.04,1.22,1,1.57,2.19,1,1.57,-1.45,0,1.78,-2.55,2,1.78,-2.55,2,-0.4,-0.56,3,0.08,0.43,0,7.3,-6.03,2,-0.04,0.44,0,1.78,-2.55,2,1.49,-1.08,2,-0.68,-0.5,3,1.49,-1.08,2,-2.18,-0.64,3,2.45,-2.84,2,4.72,-4.2,2,2.23,-2.74,2,-1.44,-0.47,3,1.78,-2.55,2,1.78,-2.55,2,-0.5,0.07,0,0.91,1.7,1,6.29,-5.29,2,1.68,2.78,1,3.25,-3.27,2,1.78,-2.55,2,0.3,1.41,1,1.26,1.75,1,5.77,-4.92,2,2.28,-1.07,2,1.67,1.46,1,1.06,1.04,1,1.78,-2.55,2,2.36,0.24,1,-1.02,-0.46,3,2.67,-0.45,2,-0.31,0.44,0,1.51,2.03,1,3.05,-3.16,2,0.21,0.95,0,-0.65,0.4,0,1.01,1.04,1,0.11,-0.73,0,2.01,-2.64,2,1.78,-2.55,2,3.37,4.53,1,2.45,-2.84,2,1.02,0.22,0,-1.02,-0.46,3,1.88,-0.93,2,1.32,2.35,1,1.78,-2.55,2,2.01,-2.64,2,-1.02,-0.46,3,0.28,-0.05,0,1.2,1.51,1,-0.5,0.07,0,1.78,-2.55,2,-1.44,-0.47,3,1.57,-1.45,0,2.65,-2.95,2,3.25,-3.27,2,3.52,4.87,1,2.45,-2.84,2,2.31,0.15,0,3.05,-3.16,2,-0.4,-0.56,3,2.86,-3.05,2,-2.18,-0.64,3,-0.68,-0.5,3,-0.15,0.04,0,-1.02,-0.46,3,-1.44,-0.47,3,-1.44,-0.47,3,1.78,-2.55,2,1.78,-2.55,2,1.84,-1.22,2,1.03,2.26,1,2.01,-2.64,2,4.18,-3.85,2,1.79,2.79,1,2.01,-2.64,2,1.61,-1.13,2,2.46,3.5,1,1.78,-2.55,2,3.16,-1.91,2,4.18,-3.85,2,2.37,-1.47,2,2.26,3.21,1,-0.4,-0.56,3,-2.18,-0.64,3,3.07,0.45,1,-0.5,0.07,0,-0.5,0.07,0,-2.18,-0.64,3,-2.18,-0.64,3,1.78,-2.55,2,-1.32,-0.03,3,0.52,-0.17,0,1.48,1.91,1,2.47,-1.53,2,1.78,-2.55,2,1.78,-2.55,2,1.02,1.58,1,1.93,2.62,1,1.88,2.76,1,0.19,0.72,0,0.89,1.5,1,1.36,2.41,1,1.28,1.37,1,2.45,-2.84,2,1.39,1.17,1,1.78,-2.55,2,-0.15,0.04,0,-0.02,0.72,0,1.11,1.03,1,-0.32,0.06,0,-1.44,-0.47,3,1.16,1.37,1,11.25,-9.05,2,1.3,1.94,1,2.65,-2.95,2,1.78,-2.55,2,1.78,0.9,1,4.36,-3.96,2,1.78,-2.55,2,1.84,-1.22,2,-1.44,-0.47,3,-0.68,-0.5,3,2.24,-0.05,0,-2.18,-0.64,3,1.1,2.14,1,3.63,-3.5,2,-0.5,0.07,0,1.78,-2.55,2,-0.65,0.4,0,3.81,-3.61,2,1.78,-2.55,2,0.73,1.45,1,1.78,-2.55,2,-0.0,0.02,0,-2.18,-0.64,3,1.78,-2.55,2,2.79,0.34,1,0.69,-0.87,0,1.78,-2.55,2,1.61,-1.13,2,1.78,-2.55,2,1.78,-2.55,2,1.37,-1.34,0,1.78,-2.55,2,-0.04,0.44,0,2.23,-2.74,2,1.25,1.68,1,1.55,2.94,1,-2.18,-0.64,3,1.49,-1.08,2,3.14,4.17,1,0.52,-0.17,0,1.1,0.81,0,10.7,-8.12,2,0.9,1.89,1,3.93,0.33,1,1.78,-2.55,2,1.73,1.91,1,-1.44,-0.47,3,-0.0,0.02,0,2.78,3.59,1,0.77,-1.02,0,2.87,-1.33,2,1.78,-2.55,2,-0.4,-0.56,3,-1.44,-0.47,3,0.65,1.57,1,-0.58,0.64,0,1.84,-1.22,2,0.56,-0.92,0,-1.44,-0.47,3,1.78,-2.55,2,0.66,1.31,1,2.72,-0.68,2,-1.44,-0.47,3,1.39,2.3,1,1.78,-2.55,2,2.47,-0.14,0,0.53,-0.13,0,4.18,-3.85,2,1.2,1.99,1,0.52,0.94,0,0.87,2.11,1,0.06,1.11,0,-1.2,0.26,3,2.17,-0.66,0,2.01,-2.64,2,-0.13,0.72,0,3.05,-3.16,2,0.32,1.14,0,0.85,1.61,1,-0.21,0.9,0,1.1,1.99,1,-1.32,-0.03,3,-2.18,-0.64,3,2.74,-0.66,0,0.87,0.24,0,1.78,-2.55,2,1.37,-1.34,0,2.58,3.64,1,1.79,2.87,1,-0.65,0.4,0,-0.26,0.7,0,2.81,4.1,1,17.17,-13.8,2,-0.68,-0.5,3,2.28,1.73,1,0.89,1.22,1,2.33,3.72,1,-1.02,-0.46,3,-0.65,0.4,0,2.34,-0.51,2,5.08,-4.44,2,3.81,-2.31,2,-0.46,0.43,0,11.73,-9.43,2,0.94,1.22,1,3.63,-3.5,2,-2.18,-0.64,3,-0.02,0.72,0,1.17,1.99,1,1.84,-1.22,2,1.37,-1.04,0,1.49,0.76,1,-0.97,0.04,3,2.21,-0.78,2,0.96,1.04,1,3.43,-1.94,2,1.61,2.03,1,0.11,-0.73,0,2.01,-2.64,2,3.25,-3.27,2,-0.46,0.43,0,4.09,-2.88,2,0.34,-0.82,0,-1.32,-0.03,3,1.02,0.22,0,0.14,-0.01,0,2.01,-2.64,2,1.84,-1.22,2,-1.44,-0.47,3,1.61,-1.13,2,2.37,-1.47,2,1.61,1.47,1,-0.88,0.36,3,0.94,1.22,1,3.24,4.33,1,2.37,1.71,1,-0.4,-0.56,3,-0.65,0.4,0,1.59,2.11,1,1.96,-0.96,2,0.32,1.14,0,3.63,-3.5,2,1.37,-1.34,0,2.28,-1.07,2,1.78,-2.55,2,-2.18,-0.64,3,1.46,1.18,1,2.85,-0.12,0,3.05,-3.16,2,3.27,3.76,1,1.73,-1.17,2,6.46,-5.41,2,0.3,1.41,1,26.31,-21.31,2,-0.32,0.06,0,5.77,-4.92,2,1.78,-2.55,2,-0.34,0.88,0,0.88,1.97,1,1.01,1.04,1,11.57,-9.31,2,1.78,-2.55,2,-0.65,0.4,0,0.97,2.19,1,0.82,1.12,0,2.27,3.54,1,1.78,-2.55,2,2.6,-1.17,2,0.09,0.72,0,3.63,-3.5,2,1.79,-0.9,2,-1.02,-0.46,3,0.36,0.71,0,1.78,-2.55,2,1.05,2.06,1,-0.26,0.7,0,-1.02,-0.46,3,1.62,2.33,1,3.63,-3.5,2,1.78,-2.55,2,-0.5,0.07,0,2.01,-2.64,2,1.78,-2.55,2,3.05,-3.16,2,1.78,-2.55,2,-0.68,-0.5,3,2.41,-0.28,0,6.97,-5.78,2,1.26,0.79,0,2.47,-1.53,2,1.73,-1.17,2,-0.71,0.07,3,3.43,4.43,1,0.3,0.4,0,3.26,-1.97,2,-1.44,-0.47,3,1.64,1.71,1,1.78,-2.55,2,1.78,-2.55,2,1.78,-2.55,2,2.1,3.14,1,1.78,-2.55,2,-0.4,-0.56,3,-1.44,-0.47,3,1.57,-1.45,0,1.16,0.81,0,2.04,2.81,1,2.45,-2.84,2,1.49,-1.08,2,1.87,0.47,1,1.78,-2.55,2,3.05,-3.16,2,3.14,-1.14,2,-0.97,0.04,3,0.45,0.95,0,-0.97,0.04,3,2.31,-0.23,0,3.54,-2.14,2,-0.32,0.06,0,-0.5,0.07,0,1.83,2.87,1,3.05,-3.16,2,-1.44,-0.47,3,-0.5,0.07,0,2.06,-1.32,2,1.78,-2.55,2,2.12,0.33,1,2.27,-1.42,2,1.4,1.85,1,0.15,1.12,0,1.84,-1.22,2,-0.97,0.04,3,1.78,0.49,1,-0.46,0.43,0,0.64,-0.18,0,-1.44,-0.47,3,2.29,-0.07,0,1.61,-1.13,2,-0.97,0.04,3,4.18,-3.85,2,-0.58,0.64,0,1.78,-2.55,2,2.23,-2.74,2,-0.4,-0.56,3,3.16,-1.91,2,-1.44,-0.47,3,0.35,1.29,0,-2.18,-0.64,3,1.78,-2.55,2,-0.68,-0.5,3,1.78,-2.55,2,-0.4,-0.56,3,-1.32,-0.03,3,1.86,2.54,1,2.11,3.26,1,2.56,-0.61,2,-0.4,-0.56,3,2.52,0.05,0,1.78,-2.55,2,-1.32,-0.03,3,0.21,0.95,0,1.61,-1.13,2,1.76,-1.56,0,-0.97,0.04,3,11.98,-8.61,2,1.78,-2.55,2,0.24,1.68,1,1.78,-2.55,2,4.36,-3.96,2,-0.4,-0.56,3,2.08,0.34,1,2.45,-2.84,2,1.73,-1.17,2,1.78,-2.55,2,2.86,-3.05,2,1.03,1.38,1,1.78,-2.55,2,-0.71,0.07,3,3.05,-3.16,2,-0.0,0.02,0,2.39,3.6,1,0.06,1.11,0,1.78,-2.55,2,1.78,-2.55,2,3.63,-3.5,2,1.78,2.83,1,2.65,-2.95,2,1.38,1.67,1,1.7,-0.88,2,2.01,-2.64,2,-0.68,-0.5,3,1.78,-2.55,2,1.59,1.94,1,2.25,2.18,1,-0.21,0.9,0,-1.44,-0.47,3,1.78,-2.55,2,2.68,-2.13,2,-0.4,-0.56,3,1.87,2.67,1,-0.4,-0.56,3,0.67,1.68,1,2.01,-2.64,2,1.1,0.2,0,2.33,-2.0,2,1.61,-1.13,2,-1.44,-0.47,3,-0.4,-0.56,3,1.95,-1.27,2,1.78,-2.55,2,1.55,2.33,1,1.78,-2.55,2,2.39,1.0,1,1.12,-0.96,0,-0.31,0.44,0,1.16,1.03,1,2.4,-0.54,2,1.06,1.04,1,1.78,-2.55,2,2.27,-1.42,2,-2.18,-0.64,3,1.78,-2.55,2,0.3,0.4,0,1.78,-2.55,2,1.12,1.51,1,0.51,0.27,0,2.01,-2.64,2,1.42,2.3,1,1.42,2.3,1,0.84,-0.89,0,-1.32,-0.03,3,0.75,1.58,1,7.69,-3.77,2,1.78,-2.55,2,-1.44,-0.47,3,1.78,-2.55,2,-2.18,-0.64,3,1.45,0.76,1,3.27,4.42,1,4.11,-2.03,2,1.78,-2.55,2,-0.68,-0.5,3,1.78,-2.55,2,4.18,-3.85,2,2.16,-1.37,2,3.63,-3.5,2,-1.32,-0.03,3,1.78,-2.55,2,1.4,-0.35,0,-1.44,-0.47,3,3.43,4.69,1,3.05,-3.16,2,3.81,-3.61,2,0.77,-1.02,0,1.78,-2.55,2,0.84,-0.89,0,2.38,-0.1,0,1.79,-0.9,2,1.78,-2.55,2,1.27,1.21,1,2.01,-2.64,2,2.31,-0.23,0,1.16,1.51,1,0.95,-0.23,0,0.66,1.31,1,1.61,-0.86,2,1.78,-2.55,2,-1.32,-0.03,3,1.64,0.95,1,3.05,-3.16,2,0.76,0.29,0,1.78,-2.55,2,-2.18,-0.64,3,1.21,1.02,1,0.28,-0.05,0,1.78,-2.55,2,-0.04,0.44,0,0.72,1.3,1,0.23,1.4,0,0.69,-0.87,0,-0.68,-0.5,3,2.01,-2.64,2,-0.5,0.07,0,-0.04,0.44,0,1.95,-1.27,2,0.85,0.58,0,1.78,-2.55,2,0.72,1.3,1,2.51,-0.16,0,1.0,1.8,1,1.37,-1.34,0,1.35,1.0,1,-0.31,0.44,0,-1.44,-0.47,3,-0.71,0.07,3,-0.5,0.07,0,1.11,1.03,1,-0.71,0.07,3,-2.18,-0.64,3,2.36,-1.1,2,0.88,1.97,1,1.78,-2.55,2,-2.18,-0.64,3,0.97,1.44,1,1.78,-2.55,2,-1.44,-0.47,3,1.49,-1.08,2,3.17,4.27,1,3.4,0.17,1,-0.4,-0.56,3,1.78,-2.55,2,1.49,-1.08,2,1.73,0.44,0,2.45,-2.84,2,0.65,0.93,0,2.04,-0.98,2,1.82,1.57,1,0.88,1.8,1,2.01,-2.64,2,2.11,2.47,1,1.77,2.78,1,-0.4,-0.56,3,4.72,-4.2,2,2.45,-2.04,2,-2.18,-0.64,3,1.59,2.11,1,1.57,1.84,1,1.78,-2.55,2,2.66,0.18,1,4.18,-3.85,2,-0.4,-0.56,3,2.01,-2.64,2,7.3,-6.03,2,-2.18,-0.64,3,2.42,3.36,1,0.08,0.43,0,1.78,-2.55,2,-1.44,-0.47,3,-1.44,-0.47,3,2.43,0.14,1,2.45,-2.84,2,1.79,2.39,1,1.49,-1.08,2,12.06,-9.69,2,-0.71,0.07,3,2.1,2.96,1,-0.15,0.04,0,1.5,1.34,1,2.57,-0.36,0,-2.18,-0.64,3,0.69,-0.87,0,2.23,-2.74,2,-0.88,0.36,3,0.19,0.72,0,2.13,-1.01,2,1.05,2.31,1,2.45,-2.84,2,1.78,-2.55,2,3.34,4.31,1,1.78,-2.55,2,0.78,1.22,1,-2.18,-0.64,3,-0.26,0.7,0,1.78,-2.55,2,6.8,-5.66,2,-0.68,-0.5,3,-1.98,-0.27,3,1.78,-2.55,2,0.89,1.22,1,1.85,2.32,1,2.65,-2.95,2,0.86,1.89,1,1.25,2.02,1,-2.18,-0.64,3,-1.02,-0.46,3,-1.44,-0.47,3,1.46,1.74,1,1.99,1.4,1,0.65,1.57,1,1.61,-1.13,2,2.29,-0.07,0,2.13,-1.01,2,0.11,-0.73,0,7.78,-5.83,2,2.06,3.33,1,1.16,1.84,1,-1.02,-0.46,3,1.78,-2.55,2,1.78,-2.55,2,3.35,-2.02,2,0.19,0.72,0,16.06,-12.89,2,1.78,-2.55,2,1.16,0.81,0,0.47,1.74,1,0.11,-0.73,0,0.28,-0.05,0,-1.44,-0.47,3,7.95,-4.69,2,1.78,-2.55,2,-1.32,-0.03,3,1.16,1.37,1,5.25,-4.56,2,1.49,-1.08,2,3.63,-3.5,2,-0.4,-0.56,3,1.26,2.29,1,-1.02,-0.46,3,1.61,-1.13,2,-0.4,-0.56,3,0.26,1.51,1,0.56,-0.92,0,0.11,-0.73,0,-0.71,0.07,3,4.72,-4.2,2,0.86,-0.21,0,0.36,0.71,0,1.78,-2.55,2,-1.44,-0.47,3,-2.18,-0.64,3,2.16,-1.37,2,2.01,-2.64,2,4.71,-2.9,2,2.01,-2.64,2,2.15,2.97,1]},
+};
+
+/* =================== util SVG =================== */
+const NS="http://www.w3.org/2000/svg";
+function E(tag,attrs={},kids=[]){
+  const e=document.createElementNS(NS,tag);
+  for(const k in attrs) e.setAttribute(k,attrs[k]);
+  (Array.isArray(kids)?kids:[kids]).forEach(c=>{ if(c!=null) e.appendChild(typeof c==="string"?document.createTextNode(c):c); });
+  return e;
+}
+function svg(w,h){ return E("svg",{viewBox:`0 0 ${w} ${h}`,preserveAspectRatio:"xMidYMid meet"}); }
+function txt(x,y,s,cls="ax",extra={}){ return E("text",Object.assign({x,y,class:cls},extra),String(s)); }
+const nf = new Intl.NumberFormat("pt-BR");
+const fmtK = v => v>=1000? (v/1000).toLocaleString("pt-BR",{maximumFractionDigits:0})+"k" : String(v);
+
+/* =================== charts =================== */
+function barChart(id, data, {W=460,H=300,fmt=(v)=>nf.format(v),color=null,suffix="",maxPad=1.15}={}){
+  const box=document.getElementById(id); if(!box) return; box.innerHTML="";
+  const m={t:24,r:16,b:44,l:16};
+  const s=svg(W,H);
+  const max=Math.max(...data.map(d=>d.v))*maxPad;
+  const iw=W-m.l-m.r, ih=H-m.t-m.b;
+  const n=data.length, gap=iw*0.12, bw=(iw-gap*(n-1))/n;
+  // gridlines
+  for(let g=0;g<=4;g++){ const y=m.t+ih*(g/4); s.appendChild(E("line",{x1:m.l,y1:y,x2:W-m.r,y2:y,class:"gridline"})); }
+  data.forEach((d,i)=>{
+    const x=m.l+i*(bw+gap), h=ih*(d.v/max), y=m.t+ih-h;
+    const col=d.c||color||COL.accent;
+    const r=E("rect",{x,y,width:bw,height:h,rx:5,fill:col,class:"bar",style:`animation-delay:${i*80}ms`});
+    s.appendChild(r);
+    s.appendChild(txt(x+bw/2,y-8,fmt(d.v)+suffix,"val",{"text-anchor":"middle"}));
+    s.appendChild(txt(x+bw/2,H-22,d.l,"ax",{"text-anchor":"middle"}));
+    if(d.sub) s.appendChild(txt(x+bw/2,H-6,d.sub,"axlab",{"text-anchor":"middle"}));
+  });
+  box.appendChild(s);
+}
+
+function lineArea(id, arr, {W=460,H=300}={}){
+  const box=document.getElementById(id); if(!box) return; box.innerHTML="";
+  const m={t:20,r:14,b:34,l:40}; const s=svg(W,H);
+  const iw=W-m.l-m.r, ih=H-m.t-m.b; const max=Math.max(...arr)*1.1;
+  for(let g=0;g<=3;g++){ const y=m.t+ih*(g/3); s.appendChild(E("line",{x1:m.l,y1:y,x2:W-m.r,y2:y,class:"gridline"}));
+    s.appendChild(txt(m.l-6,y+4,fmtK(Math.round(max*(1-g/3))),"axlab",{"text-anchor":"end"})); }
+  const X=i=>m.l+iw*(i/(arr.length-1)), Y=v=>m.t+ih*(1-v/max);
+  let d="M"+X(0)+" "+Y(arr[0]); arr.forEach((v,i)=>{ if(i) d+=" L"+X(i)+" "+Y(v); });
+  const area=d+` L${X(arr.length-1)} ${m.t+ih} L${X(0)} ${m.t+ih} Z`;
+  const grad=E("linearGradient",{id:id+"_g",x1:0,y1:0,x2:0,y2:1});
+  grad.appendChild(E("stop",{offset:"0%","stop-color":COL.accent,"stop-opacity":.35}));
+  grad.appendChild(E("stop",{offset:"100%","stop-color":COL.accent,"stop-opacity":0}));
+  s.appendChild(grad);
+  s.appendChild(E("path",{d:area,fill:`url(#${id}_g)`}));
+  s.appendChild(E("path",{d,fill:"none",stroke:COL.accent,"stroke-width":2.5,"stroke-linejoin":"round",class:"draw"}));
+  // peak marker
+  const pk=arr.indexOf(Math.max(...arr));
+  s.appendChild(E("circle",{cx:X(pk),cy:Y(arr[pk]),r:4,fill:COL.accent,class:"pop"}));
+  s.appendChild(txt(X(pk),Y(arr[pk])-10,"18h","val",{"text-anchor":"middle"}));
+  [0,6,12,18,23].forEach(h=> s.appendChild(txt(X(h),H-12,h+"h","ax",{"text-anchor":"middle"})));
+  box.appendChild(s);
+}
+
+function hourDual(id, vol, ig, {W=400,H=280}={}){
+  const box=document.getElementById(id); if(!box) return; box.innerHTML="";
+  const m={t:26,r:40,b:36,l:42}; const s=svg(W,H);
+  const iw=W-m.l-m.r, ih=H-m.t-m.b;
+  const vmax=Math.max(...vol)*1.12;
+  const gLo=Math.min(...ig)-0.4, gHi=Math.max(...ig)+0.4;
+  const X=i=>m.l+iw*(i/(vol.length-1));
+  const Yv=v=>m.t+ih*(1-v/vmax);
+  const Yg=v=>m.t+ih*(1-(v-gLo)/(gHi-gLo));
+  for(let g=0;g<=3;g++){ const y=m.t+ih*(g/3); s.appendChild(E("line",{x1:m.l,y1:y,x2:W-m.r,y2:y,class:"gridline"}));
+    s.appendChild(txt(m.l-6,y+4,fmtK(Math.round(vmax*(1-g/3))),"axlab",{"text-anchor":"end",fill:COL.accent}));
+    s.appendChild(txt(W-m.r+6,y+4,(gHi-(gHi-gLo)*(g/3)).toFixed(1),"axlab",{fill:COL.accent2})); }
+  // volume: área + linha (vermelho)
+  const grad=E("linearGradient",{id:id+"_g",x1:0,y1:0,x2:0,y2:1});
+  grad.appendChild(E("stop",{offset:"0%","stop-color":COL.accent,"stop-opacity":.26}));
+  grad.appendChild(E("stop",{offset:"100%","stop-color":COL.accent,"stop-opacity":0}));
+  s.appendChild(grad);
+  let dv="M"+X(0)+" "+Yv(vol[0]); vol.forEach((v,i)=>{ if(i) dv+=" L"+X(i)+" "+Yv(v); });
+  s.appendChild(E("path",{d:dv+` L${X(vol.length-1)} ${m.t+ih} L${X(0)} ${m.t+ih} Z`,fill:`url(#${id}_g)`}));
+  s.appendChild(E("path",{d:dv,fill:"none",stroke:COL.accent,"stroke-width":2.4,class:"draw"}));
+  // gravidade: linha tracejada (âmbar)
+  let dg="M"+X(0)+" "+Yg(ig[0]); ig.forEach((v,i)=>{ if(i) dg+=" L"+X(i)+" "+Yg(v); });
+  s.appendChild(E("path",{d:dg,fill:"none",stroke:COL.accent2,"stroke-width":2.4,"stroke-dasharray":"5 3",class:"draw"}));
+  [0,6,12,18,23].forEach(h=> s.appendChild(txt(X(h),H-12,h+"h","ax",{"text-anchor":"middle"})));
+  // legenda
+  s.appendChild(E("rect",{x:m.l,y:m.t-16,width:13,height:4,rx:2,fill:COL.accent}));
+  s.appendChild(txt(m.l+18,m.t-12,"acidentes","axlab",{fill:COL.accent}));
+  s.appendChild(E("rect",{x:m.l+92,y:m.t-16,width:13,height:4,rx:2,fill:COL.accent2}));
+  s.appendChild(txt(m.l+110,m.t-12,"índ. gravidade","axlab",{fill:COL.accent2}));
+  box.appendChild(s);
+}
+
+function donut(id, data, {W=460,H=300}={}){
+  const box=document.getElementById(id); if(!box) return; box.innerHTML="";
+  const s=svg(W,H); const cx=W*0.34, cy=H/2, R=Math.min(W*0.30,H*0.42), r=R*0.6;
+  const tot=data.reduce((a,d)=>a+d.v,0); let ang=-Math.PI/2;
+  data.forEach((d,i)=>{
+    const a0=ang, a1=ang+2*Math.PI*d.v/tot; ang=a1;
+    const large=(a1-a0)>Math.PI?1:0;
+    const p=(rad,a)=>[cx+rad*Math.cos(a),cy+rad*Math.sin(a)];
+    const [x0,y0]=p(R,a0),[x1,y1]=p(R,a1),[x2,y2]=p(r,a1),[x3,y3]=p(r,a0);
+    const dd=`M${x0} ${y0} A${R} ${R} 0 ${large} 1 ${x1} ${y1} L${x2} ${y2} A${r} ${r} 0 ${large} 0 ${x3} ${y3} Z`;
+    s.appendChild(E("path",{d:dd,fill:SEV[i],class:"pop",style:`animation-delay:${i*90}ms;transform-origin:${cx}px ${cy}px`}));
+  });
+  s.appendChild(txt(cx,cy-4,nf.format(tot),"val",{"text-anchor":"middle","font-size":"22"}));
+  s.appendChild(txt(cx,cy+18,"acidentes","axlab",{"text-anchor":"middle"}));
+  // legend
+  let ly=cy-R+6; const lx=W*0.66;
+  data.forEach((d,i)=>{
+    s.appendChild(E("rect",{x:lx,y:ly-10,width:13,height:13,rx:3,fill:SEV[i]}));
+    s.appendChild(txt(lx+20,ly,d.l,"ax"));
+    s.appendChild(txt(W-14,ly,(100*d.v/tot).toFixed(1)+"%","val",{"text-anchor":"end"}));
+    ly+=H*0.16;
+  });
+  box.appendChild(s);
+}
+
+function pareto(id, {x,cum}, {W=560,H=320}={}){
+  const box=document.getElementById(id); if(!box) return; box.innerHTML="";
+  const m={t:20,r:20,b:44,l:44}; const s=svg(W,H);
+  const iw=W-m.l-m.r, ih=H-m.t-m.b;
+  const X=v=>m.l+iw*(v/100), Y=v=>m.t+ih*(1-v/100);
+  for(let g=0;g<=4;g++){ const y=m.t+ih*(g/4); s.appendChild(E("line",{x1:m.l,y1:y,x2:W-m.r,y2:y,class:"gridline"}));
+    s.appendChild(txt(m.l-6,y+4,(100-g*25)+"%","axlab",{"text-anchor":"end"})); }
+  // reference diagonal (perfeita igualdade)
+  s.appendChild(E("line",{x1:X(0),y1:Y(0),x2:X(100),y2:Y(100),stroke:COL.faint,"stroke-width":1,"stroke-dasharray":"4 4"}));
+  // area + line
+  let d="M"+X(x[0])+" "+Y(cum[0]); x.forEach((v,i)=>{ if(i) d+=" L"+X(v)+" "+Y(cum[i]); });
+  const grad=E("linearGradient",{id:id+"_g",x1:0,y1:0,x2:0,y2:1});
+  grad.appendChild(E("stop",{offset:"0%","stop-color":COL.accent,"stop-opacity":.30}));
+  grad.appendChild(E("stop",{offset:"100%","stop-color":COL.accent,"stop-opacity":0}));
+  s.appendChild(grad);
+  s.appendChild(E("path",{d:d+` L${X(100)} ${m.t+ih} L${X(0)} ${m.t+ih} Z`,fill:`url(#${id}_g)`}));
+  s.appendChild(E("path",{d,fill:"none",stroke:COL.accent,"stroke-width":2.5,class:"draw"}));
+  // marker at 10% -> 44.7
+  const mx=X(10),my=Y(44.7);
+  s.appendChild(E("line",{x1:mx,y1:my,x2:mx,y2:m.t+ih,stroke:COL.accent2,"stroke-width":1,"stroke-dasharray":"3 3"}));
+  s.appendChild(E("line",{x1:m.l,y1:my,x2:mx,y2:my,stroke:COL.accent2,"stroke-width":1,"stroke-dasharray":"3 3"}));
+  s.appendChild(E("circle",{cx:mx,cy:my,r:5,fill:COL.accent2,class:"pop"}));
+  s.appendChild(txt(mx+8,my-8,"10% dos trechos → 44,7%","val",{fill:COL.accent2}));
+  [0,10,20,40,60,80,100].forEach(v=> s.appendChild(txt(X(v),H-22,v+"%","ax",{"text-anchor":"middle"})));
+  s.appendChild(txt(W/2,H-4,"% dos trechos (ordenados por gravidade)","axlab",{"text-anchor":"middle"}));
+  box.appendChild(s);
+}
+
+function dualAxis(id, {k,sse,sil}, {W=560,H=320}={}){
+  const box=document.getElementById(id); if(!box) return; box.innerHTML="";
+  const m={t:24,r:48,b:40,l:52}; const s=svg(W,H);
+  const iw=W-m.l-m.r, ih=H-m.t-m.b;
+  const maxS=Math.max(...sse), minSil=Math.min(...sil)*0.95, maxSil=Math.max(...sil)*1.02;
+  const X=i=>m.l+iw*(i/(k.length-1));
+  const Yl=v=>m.t+ih*(1-v/maxS);
+  const Yr=v=>m.t+ih*(1-(v-minSil)/(maxSil-minSil));
+  for(let g=0;g<=4;g++){ const y=m.t+ih*(g/4); s.appendChild(E("line",{x1:m.l,y1:y,x2:W-m.r,y2:y,class:"gridline"})); }
+  // SSE line (steel)
+  let d1="M"+X(0)+" "+Yl(sse[0]); sse.forEach((v,i)=>{ if(i) d1+=" L"+X(i)+" "+Yl(v); });
+  s.appendChild(E("path",{d:d1,fill:"none",stroke:COL.steel,"stroke-width":2.5,class:"draw"}));
+  sse.forEach((v,i)=> s.appendChild(E("circle",{cx:X(i),cy:Yl(v),r:3,fill:COL.steel})));
+  // Silhouette line (accent)
+  let d2="M"+X(0)+" "+Yr(sil[0]); sil.forEach((v,i)=>{ if(i) d2+=" L"+X(i)+" "+Yr(v); });
+  s.appendChild(E("path",{d:d2,fill:"none",stroke:COL.accent,"stroke-width":2.5,"stroke-dasharray":"6 3",class:"draw"}));
+  sil.forEach((v,i)=> s.appendChild(E("circle",{cx:X(i),cy:Yr(v),r:3,fill:COL.accent})));
+  // highlight K=4 (index 2)
+  const ki=k.indexOf(4);
+  s.appendChild(E("line",{x1:X(ki),y1:m.t,x2:X(ki),y2:m.t+ih,stroke:COL.accent2,"stroke-width":1.5,"stroke-dasharray":"4 3"}));
+  s.appendChild(txt(X(ki),m.t-8,"K = 4","val",{"text-anchor":"middle",fill:COL.accent2}));
+  k.forEach((v,i)=> s.appendChild(txt(X(i),H-20,v,"ax",{"text-anchor":"middle"})));
+  s.appendChild(txt(m.l-8,m.t+8,"SSE","axlab",{"text-anchor":"end",fill:COL.steel}));
+  s.appendChild(txt(W-m.r+8,m.t+8,"Silh.","axlab",{fill:COL.accent}));
+  s.appendChild(txt(W/2,H-4,"número de grupos (K)","axlab",{"text-anchor":"middle"}));
+  box.appendChild(s);
+}
+
+function scatterQuadrant(id, pts, {W=460,H=320,xmax=20,ymax=100}={}){
+  const box=document.getElementById(id); if(!box) return; box.innerHTML="";
+  const m={t:20,r:20,b:44,l:44}; const s=svg(W,H);
+  const iw=W-m.l-m.r, ih=H-m.t-m.b;
+  const X=v=>m.l+iw*(v/xmax), Y=v=>m.t+ih*(1-v/ymax);
+  for(let g=0;g<=4;g++){ const y=m.t+ih*(g/4); s.appendChild(E("line",{x1:m.l,y1:y,x2:W-m.r,y2:y,class:"gridline"}));
+    s.appendChild(txt(m.l-6,y+4,Math.round(ymax*(1-g/4))+"%","axlab",{"text-anchor":"end"})); }
+  const rmax=Math.max(...pts.map(p=>p.n));
+  pts.forEach((p,i)=>{
+    const r=8+22*Math.sqrt(p.n/rmax);
+    s.appendChild(E("circle",{cx:X(p.x),cy:Y(p.y),r,fill:p.c,"fill-opacity":.75,stroke:p.c,"stroke-width":1.5,class:"pop",style:`animation-delay:${i*90}ms`}));
+    s.appendChild(txt(X(p.x),Y(p.y)+r+14,p.l,"ax",{"text-anchor":"middle","font-size":"11"}));
+  });
+  s.appendChild(txt(W/2,H-4,"volume (acidentes por trecho)","axlab",{"text-anchor":"middle"}));
+  box.appendChild(s);
+}
+
+function heatmap(id, {labels,m:mat}, {W=360,H=320}={}){
+  const box=document.getElementById(id); if(!box) return; box.innerHTML="";
+  const s=svg(W,H); const pad={t:24,r:14,b:20,l:58};
+  const n=labels.length, cw=(W-pad.l-pad.r)/n, ch=(H-pad.t-pad.b)/n;
+  const max=Math.max(...mat.flat());
+  const lerp=(a,b,t)=>Math.round(a+(b-a)*t);
+  function shade(t){ // dark panel -> accent red
+    const c0=[30,36,44], c1=[178,24,43];
+    return `rgb(${lerp(c0[0],c1[0],t)},${lerp(c0[1],c1[1],t)},${lerp(c0[2],c1[2],t)})`;
+  }
+  for(let r=0;r<n;r++) for(let c=0;c<n;c++){
+    const v=mat[r][c], t=v/max, x=pad.l+c*cw, y=pad.t+r*ch;
+    const diag=r===c;
+    s.appendChild(E("rect",{x:x+2,y:y+2,width:cw-4,height:ch-4,rx:5,fill:shade(t),
+      stroke:diag?COL.accent:"none","stroke-width":diag?2:0,class:"pop",style:`animation-delay:${(r*n+c)*22}ms`}));
+    s.appendChild(txt(x+cw/2,y+ch/2+4,v,t>0.5?"val":"ax",{"text-anchor":"middle",fill:t>0.5?"#fff":COL.muted}));
+  }
+  labels.forEach((l,i)=>{
+    s.appendChild(txt(pad.l-8,pad.t+i*ch+ch/2+4,l,"axlab",{"text-anchor":"end"}));
+    s.appendChild(txt(pad.l+i*cw+cw/2,pad.t-8,l,"axlab",{"text-anchor":"middle"}));
+  });
+  box.appendChild(s);
+}
+
+function pcaScatter(id, d, {W=520,H=340}={}){
+  const box=document.getElementById(id); if(!box) return; box.innerHTML="";
+  const vr=d.var, cent=d.cent, p=d.p;
+  const m={t:14,r:16,b:40,l:44}; const s=svg(W,H);
+  const iw=W-m.l-m.r, ih=H-m.t-m.b;
+  let xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity;
+  for(let i=0;i<p.length;i+=3){ const x=p[i],y=p[i+1];
+    if(x<xmin)xmin=x; if(x>xmax)xmax=x; if(y<ymin)ymin=y; if(y>ymax)ymax=y; }
+  const px=(xmax-xmin)*0.04, py=(ymax-ymin)*0.05;
+  const X=v=>m.l+iw*((v-(xmin-px))/((xmax+px)-(xmin-px)));
+  const Y=v=>m.t+ih*(1-(v-(ymin-py))/((ymax+py)-(ymin-py)));
+  for(let g=0;g<=4;g++){ const y=m.t+ih*(g/4); s.appendChild(E("line",{x1:m.l,y1:y,x2:W-m.r,y2:y,class:"gridline"})); }
+  const CL=[SEV[1],COL.steel2,COL.accent,COL.faint];
+  const gp=E("g",{class:"pop"});
+  for(let i=0;i<p.length;i+=3){
+    gp.appendChild(E("circle",{cx:X(p[i]),cy:Y(p[i+1]),r:2.3,fill:CL[p[i+2]],"fill-opacity":.62}));
+  }
+  s.appendChild(gp);
+  cent.forEach((c,k)=>{
+    const cx=X(c[0]),cy=Y(c[1]),r=7;
+    const seg=[[-1,-1,1,1],[-1,1,1,-1]];
+    seg.forEach(a=> s.appendChild(E("line",{x1:cx+a[0]*r,y1:cy+a[1]*r,x2:cx+a[2]*r,y2:cy+a[3]*r,stroke:"#0b0e12","stroke-width":5,"stroke-linecap":"round"})));
+    seg.forEach(a=> s.appendChild(E("line",{x1:cx+a[0]*r,y1:cy+a[1]*r,x2:cx+a[2]*r,y2:cy+a[3]*r,stroke:CL[k],"stroke-width":2.6,"stroke-linecap":"round"})));
+  });
+  // legenda (área vazia à direita)
+  const leg=["Médio/Médio","Alto volume","Crítico","Baixo/Baixo"];
+  let lx=W-m.r-104, ly=m.t+ih*0.30;
+  leg.forEach((t,k)=>{ s.appendChild(E("circle",{cx:lx,cy:ly-4,r:4.5,fill:CL[k]}));
+    s.appendChild(txt(lx+11,ly,t,"axlab")); ly+=17; });
+  s.appendChild(txt(W/2,H-6,`PC1 (${vr[0]}%)`,"axlab",{"text-anchor":"middle"}));
+  s.appendChild(E("text",{x:13,y:m.t+ih/2,class:"axlab","text-anchor":"middle",transform:`rotate(-90 13 ${m.t+ih/2})`},`PC2 (${vr[1]}%)`));
+  box.appendChild(s);
+}
+
+function ringStat(id, pct, big, small, {W=300,H=300,color=COL.accent}={}){
+  const box=document.getElementById(id); if(!box) return; box.innerHTML="";
+  const s=svg(W,H); const cx=W/2, cy=H/2, R=Math.min(W,H)*0.44, r=R*0.66, mid=(R+r)/2, tw=R-r;
+  s.appendChild(E("circle",{cx,cy,r:mid,fill:"none",stroke:COL.grid,"stroke-width":tw}));
+  const a0=-Math.PI/2, a1=a0+2*Math.PI*pct/100, large=(a1-a0)>Math.PI?1:0;
+  const x0=cx+mid*Math.cos(a0),y0=cy+mid*Math.sin(a0),x1=cx+mid*Math.cos(a1),y1=cy+mid*Math.sin(a1);
+  s.appendChild(E("path",{d:`M${x0} ${y0} A${mid} ${mid} 0 ${large} 1 ${x1} ${y1}`,fill:"none",stroke:color,"stroke-width":tw,"stroke-linecap":"round"}));
+  s.appendChild(txt(cx,cy+6,big,"val",{"text-anchor":"middle","font-size":"58","fill":color,"font-weight":"800"}));
+  s.appendChild(txt(cx,cy+34,small,"ax",{"text-anchor":"middle","font-size":"16"}));
+  box.appendChild(s);
+}
+
+/* =================== render per slide =================== */
+const RENDER = {
+  s1(){ animateCounters(document.getElementById("s1"));
+       barChart("c_anofull", DATA.anoFull.map(a=>({l:a.ano,v:a.acid,c:COL.accent2,sub:nf.format(a.mortos)+" mortos"})),
+         {W:420,H:280,fmt:v=>nf.format(v)});
+       barChart("c_janmai", DATA.janMai.map(a=>({l:a.ano,v:a.acid,c:a.hl?COL.accent:COL.accent2,sub:nf.format(a.mortos)+" mortos"})),
+         {W:560,H:280,fmt:v=>nf.format(v)}); },
+  s2(){ hourDual("c_hora", DATA.hora, DATA.igHora,{W:400,H:280});
+       barChart("c_fase", DATA.fase.map((d,i)=>({l:d.l,v:d.v,c:[SEV[0],SEV[3],SEV[1],SEV[2]][i]})),{W:400,H:280,fmt:v=>v.toFixed(1),suffix:"%",maxPad:1.25});
+       barChart("c_pista", DATA.pista.map((d,i)=>({l:d.l,v:d.v,c:[SEV[3],SEV[1],SEV[0]][i]})),{W:400,H:280,fmt:v=>v.toFixed(1),suffix:"%",maxPad:1.25}); },
+  s6(){ donut("c_classe", DATA.classe,{W:440,H:280}); },
+  s7(){ pareto("c_pareto", DATA.pareto,{W:600,H:320}); },
+  s8(){ dualAxis("c_elbow", DATA.elbow,{W:600,H:320}); },
+  s9(){ pcaScatter("c_scatter", DATA.pca,{W:470,H:340}); },
+  s12(){ ringStat("c_final", 36, "36%", "das mortes", {W:300,H:300}); },
+};
+
+function animateCounters(scope){
+  scope.querySelectorAll("[data-count]").forEach(el=>{
+    const target=+el.getAttribute("data-count");
+    if(window.__print){ el.textContent=nf.format(target); return; }  // impressão: valor final direto
+    const dur=1100; let t0=null;
+    function step(ts){ if(!t0)t0=ts; const p=Math.min(1,(ts-t0)/dur); const e=1-Math.pow(1-p,3);
+      el.textContent=nf.format(Math.round(target*e)); if(p<1) requestAnimationFrame(step); }
+    el.textContent="0"; requestAnimationFrame(step);
+  });
+}
+
+/* =================== deck engine =================== */
+const slides=[...document.querySelectorAll(".slide")];
+const N=slides.length; let cur=0; const rendered=new Set();
+const dotsWrap=document.getElementById("dots");
+slides.forEach((_,i)=>{ const b=document.createElement("button"); b.onclick=()=>go(i); dotsWrap.appendChild(b); });
+const dots=[...dotsWrap.children];
+document.getElementById("ctot").textContent=N;
+
+function go(i){
+  i=Math.max(0,Math.min(N-1,i)); if(i===cur && rendered.has(i)) {}
+  slides[cur].classList.remove("active"); cur=i; slides[cur].classList.add("active");
+  dots.forEach((d,k)=>d.classList.toggle("on",k===cur));
+  document.getElementById("cnum").textContent=cur+1;
+  document.getElementById("progress").style.width=((cur)/(N-1)*100)+"%";
+  const rid=slides[cur].id; if(RENDER[rid]) requestAnimationFrame(()=>RENDER[rid]()); // (re)render + replay
+  location.hash=cur;
+}
+function next(){ go(cur+1); } function prev(){ go(cur-1); }
+document.addEventListener("keydown",e=>{
+  if(["ArrowRight","PageDown"," "].includes(e.key)){ e.preventDefault(); next(); }
+  else if(["ArrowLeft","PageUp"].includes(e.key)){ e.preventDefault(); prev(); }
+  else if(e.key==="Home"){ go(0); } else if(e.key==="End"){ go(N-1); }
+});
+let sx=0;
+document.addEventListener("touchstart",e=>sx=e.touches[0].clientX,{passive:true});
+document.addEventListener("touchend",e=>{ const dx=e.changedTouches[0].clientX-sx; if(Math.abs(dx)>50){ dx<0?next():prev(); } });
+const start=parseInt(location.hash.slice(1))||0;
+go(Number.isFinite(start)?start:0);
+
+// render de todos os gráficos (para impressão / export PDF)
+function renderAll(){
+  window.__print=true;  // desliga animações que dependem de rAF (contadores)
+  for(const k in RENDER){ try{ RENDER[k](); }catch(e){} }
+  document.querySelectorAll("[data-count]").forEach(el=>{ el.textContent=nf.format(+el.getAttribute("data-count")); });
+}
+window.renderAll=renderAll;
+window.addEventListener("beforeprint", renderAll);
+window.addEventListener("afterprint", ()=>{ window.__print=false; });
+</script>
+</body>
+</html>
