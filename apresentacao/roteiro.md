@@ -1,15 +1,15 @@
 # Roteiro de Apresentação — Acidentes nas Rodovias Federais
 
-**Duração alvo:** 15 minutos · **Apresentadores:** 3 · **Slides:** 12
+**Duração alvo:** 15 minutos · **Apresentadores:** 3 · **Slides:** 14
 **Navegação:** setas `←` / `→` (ou barra de espaço). O número do slide aparece no canto inferior direito.
 
 > **Fio condutor (amarrar do início ao fim):** a pergunta do slide 3 — *"Onde e como investir para
 > salvar mais vidas?"* — é aberta no começo e respondida no fecho. Repita a ideia
-> **"volume ≠ gravidade"** em três momentos: contexto (slide 2), EDA (slide 7) e clusterização (slide 10).
+> **"volume ≠ gravidade"** em três momentos: contexto (slide 2), EDA (slide 9) e clusterização (slide 12).
 
-> **Ordem narrativa:** contexto e pergunta → hipótese → **como construímos** (arquitetura + pipeline)
-> → **o que os dados mostram** (EDA + concentração) → perfis de risco → conclusão. As evidências só
-> aparecem depois de apresentarmos a base e o pipeline.
+> **Ordem narrativa:** contexto e pergunta → hipótese → **como construímos** (arquitetura → pipeline
+> → dado Trusted → dado Analytics) → **o que os dados mostram** (EDA + concentração) → perfis de
+> risco → conclusão. As evidências só aparecem depois de mostrarmos a base e o pipeline.
 
 ---
 
@@ -47,9 +47,9 @@
 
 ---
 
-## Bloco 2 — Apresentador 2 · Como construímos & evidências (slides 5–8, ~5:00)
+## Bloco 2 — Apresentador 2 · Como construímos & evidências (slides 5–9, ~5:30)
 
-### Slide 5 — Arquitetura lógica · 60s
+### Slide 5 — Arquitetura lógica · 55s
 - **Objetivo:** dar visão de engenharia — reprodutível e em camadas.
 - **Âncoras:** Fontes CSV → Polars (ETL) → Trusted (parquet) → Feature Engineering → Analytics →
   Clusterização/Priorização. Stack: Python, Polars, scikit-learn.
@@ -57,63 +57,88 @@
   viram uma camada **Trusted** em parquet, ganham novas variáveis na feature engineering e chegam à
   camada **Analytics**, que alimenta as análises. Tudo reprodutível e versionado."
 
-### Slide 6 — Da matéria-bruta ao dado analítico · 70s
+### Slide 6 — Da matéria-bruta ao dado analítico · 55s
 - **Objetivo:** detalhar os 4 passos e a variável-chave.
 - **Âncoras:** índice de gravidade = 12·mortos + 6·graves + 2·leves; trecho = UF_BR_km.
-- **Fala:** "São quatro passos: tratamento, exploração, engenharia de variáveis e nova exploração.
-  A variável central é o **índice de gravidade**, que pesa cada vítima — 12 para morte, 6 para ferido
-  grave, 2 para leve. E segmentamos cada rodovia em **trechos**. O donut mostra que o índice separa
-  bem: poucos acidentes concentram a severidade."
+- **Fala:** "O pipeline tem quatro passos: tratamento, exploração, engenharia de variáveis e nova
+  exploração. A variável central é o **índice de gravidade**, que pesa cada vítima — 12 para morte,
+  6 para grave, 2 para leve. E segmentamos cada rodovia em **trechos**. Vamos ver as duas camadas
+  de dado que ele produz."
 
-### Slide 7 — O risco não é aleatório (EDA) · 70s
+### Slide 7 — Camada Trusted (amostra) · 30s
+- **Objetivo:** mostrar o dado real limpo, no nível do acidente.
+- **Âncoras:** 145.685 boletins (2024–2025), 31 colunas; 1 linha = 1 acidente.
+- **Fala:** "Esta é a camada Trusted, saída do ETL: cada linha é um acidente já tratado — data, local,
+  tipo de via, vítimas. É a matéria-prima confiável de todo o resto."
+
+### Slide 8 — Camada Analytics · trechos (amostra) · 30s
+- **Objetivo:** mostrar o dado agregado por trecho, pronto para analisar.
+- **Âncoras:** 33.024 trechos (UF_BR_km) com frequência e gravidade por segmento.
+- **Fala:** "O resultado é a camada Analytics: os acidentes viram 33 mil trechos, cada um com sua
+  frequência e seus índices de gravidade. É sobre esta tabela que rodam a clusterização e a
+  priorização."
+
+### Slide 9 — O risco não é aleatório (EDA) · 65s
 - **Objetivo:** apresentar as evidências da EDA — agora que a base já foi apresentada.
-- **Âncoras:** pico de volume às 18h; noite/amanhecer ~2× mais letais que o dia; pista simples ~10%
+- **Âncoras:** pico de volume às 18h vs. índice de gravidade maior de madrugada; pista simples ~10%
   fatais vs. ~5% na dupla.
-- **Fala:** "Com a base tratada, a exploração confirma parte da hipótese. O volume se concentra no
-  fim de tarde — mas a **letalidade** se concentra à noite e na **pista simples**, o dobro da pista
-  dupla. Aqui aparece de novo a frase-chave: **volume e gravidade não são a mesma coisa.**"
-
-### Slide 8 — O risco é concentrado · 60s
-- **Objetivo:** entregar a evidência que valida a hipótese da concentração espacial.
-- **Âncoras:** 10% dos trechos = 44,7% da gravidade; 36% dos trechos = 80%.
-- **Fala:** "E a concentração espacial se confirma: **10% dos trechos concentram quase 45% de toda a
-  gravidade.** A priorização deixa de ser opinião e vira aritmética — atacar os trechos certos
-  multiplica o impacto de cada real."
-- **Transição:** "Se o risco se concentra, quais são esses perfis de trecho? O [próximo apresentador]
-  mostra os grupos e fecha com a resposta."
+- **Fala:** "Com a base pronta, a exploração confirma parte da hipótese. O volume se concentra no fim
+  de tarde — mas a **gravidade média** sobe de madrugada, e a **pista simples** mata o dobro da dupla.
+  Aparece de novo a frase-chave: **volume e gravidade não são a mesma coisa.**"
 
 ---
 
-## Bloco 3 — Apresentador 3 · Perfis de risco & conclusão (slides 9–12, ~5:30)
+## Bloco 3 — Apresentador 3 · Perfis de risco & conclusão (slides 10–14, ~5:00)
 
-### Slide 9 — Quantos perfis existem? · 55s
+### Slide 10 — O risco é concentrado · 50s
+- **Objetivo:** entregar a evidência que valida a hipótese da concentração espacial.
+- **Âncoras:** 10% dos trechos = 44,7% da gravidade; 36% dos trechos = 80%.
+- **Fala:** "E a concentração espacial se confirma: **10% dos trechos concentram quase 45% de toda a
+  gravidade.** A priorização deixa de ser opinião e vira aritmética."
+
+### Slide 11 — Quantos perfis existem? · 45s
 - **Objetivo:** justificar K=4 sem jargão excessivo.
 - **Âncoras:** cotovelo + silhueta; escolha K=4.
-- **Fala:** "Usamos KMeans para agrupar trechos parecidos. O método do cotovelo e a silhueta apontam
-  para poucos grupos; escolhemos **quatro**, que equilibram compactação estatística e leitura de
-  negócio: volume contra letalidade."
+- **Fala:** "Usamos KMeans para agrupar trechos parecidos. Cotovelo e silhueta apontam para poucos
+  grupos; escolhemos **quatro**, que equilibram estatística e leitura de negócio."
 
-### Slide 10 — Quatro perfis e um grupo crítico · 75s
+### Slide 12 — Quatro perfis e um grupo crítico · 70s
 - **Objetivo:** revelar o achado central da clusterização.
-- **Âncoras:** grupo crítico = 8,9% dos trechos, 87,8% fatais, 4.410 mortos ≈ 36% do total. A
-  projeção PCA (87,3% da variância) mostra o grupo crítico se descolando dos demais.
-- **Fala:** "Os trechos se organizam em dois eixos. Há corredores de alto volume, há a malha comum, e
-  há um **grupo crítico**: raro, mas letal — 8,9% dos trechos que respondem por **mais de um terço de
-  todas as mortes**. É o alvo de maior retorno em vidas."
+- **Âncoras:** grupo crítico = 8,9% dos trechos, 87,8% fatais, 4.410 mortos ≈ 36% do total; PCA
+  87,3% da variância.
+- **Fala:** "Os trechos se organizam em dois eixos. Há corredores de alto volume, a malha comum, e um
+  **grupo crítico**: raro, mas letal — 8,9% dos trechos que respondem por **mais de um terço das
+  mortes**. É o alvo de maior retorno em vidas."
 
-### Slide 11 — Onde investir e o quê fazer · 75s
+### Slide 13 — Onde investir e o quê fazer · 70s
 - **Objetivo:** traduzir tudo em recomendação por perfil de via.
-- **Âncoras:** BR-101/116 (carga: ~1,5 mil mortos cada); BR-222/316/153/262/163 (letalidade + pista
-  simples).
+- **Âncoras:** BR-101/116 (carga: ~1,5 mil mortos cada); BR-222/316/153 (letalidade + pista simples).
 - **Fala:** "A resposta tem dois lados. Nos **corredores de carga** — BR-101 e BR-116 — o caminho é
   gestão de tráfego, fiscalização e capacidade. Nas **rodovias de pista simples e alta letalidade** —
-  como a BR-316 e a BR-153 — o maior retorno em vidas vem de **duplicação, barreira central e
-  iluminação**. E nos trechos pontualmente letais, intervenções dirigidas pelo perfil."
+  BR-316, BR-153 — o maior retorno em vidas vem de **duplicação, barreira central e iluminação**."
 
-### Slide 12 — A resposta · 60s
+### Slide 14 — A resposta · 60s
 - **Objetivo:** responder à pergunta do slide 3 e encerrar com a ressalva.
 - **Âncoras:** 36% das mortes em 8,9% dos trechos (o anel à direita).
 - **Fala:** "Voltando à pergunta que abriu a apresentação: investir onde o risco **se concentra**,
   não onde ele apenas **se acumula**. Três frentes: corredores de volume, pista simples letal e os
   trechos críticos. A ressalva honesta: sem dados de tráfego e de velocidade da via, a priorização
   fina ainda é limitada — é o nosso próximo passo. Obrigado."
+
+---
+
+## Ensaios e dicas de tempo
+
+| Bloco | Slides | Tempo alvo |
+|---|---|---|
+| 1 — Contexto, pergunta & hipótese | 1–4 | ~4:30 |
+| 2 — Construção & evidências | 5–9 | ~5:30 |
+| 3 — Perfis de risco & conclusão | 10–14 | ~5:00 |
+| Margem / perguntas | — | ~0:30 |
+
+- **Não leia os slides.** Eles dão o contexto visual; a fala acrescenta a narrativa.
+- **Slides de tabela (7 e 8) são rápidos:** aponte 1–2 colunas e siga; não leia a tabela.
+- **Números-âncora por slide:** decore 1–2 por tela (marcados em cada seção acima).
+- **Passagem de bastão:** use as frases de transição ao fim de cada bloco.
+- **Se atrasar:** encurte os slides 7 e 8 (amostras de dados) — são ilustrativos.
+- **Frase-marca a repetir 3×:** *"volume não é o mesmo que gravidade."*

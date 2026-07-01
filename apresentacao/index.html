@@ -212,6 +212,18 @@
     padding:1.4vh 1.4vw;font-size:1.65vh;line-height:1.4}
   .takeaway b{color:var(--accent)}
 
+  /* ---------- tabela (head de dataset) ---------- */
+  .dtable-wrap{flex:1;min-height:0;display:flex;align-items:center;overflow:hidden}
+  .dtable{width:100%;border-collapse:collapse;font-size:1.7vh;font-variant-numeric:tabular-nums}
+  .dtable th,.dtable td{padding:1.05vh 1.1vw;text-align:left;white-space:nowrap}
+  .dtable th{color:var(--muted);font-weight:700;font-size:1.4vh;text-transform:uppercase;letter-spacing:.05em;
+    border-bottom:2px solid var(--line)}
+  .dtable td{color:var(--ink);border-bottom:1px solid var(--grid)}
+  .dtable tbody tr:last-child td{border-bottom:0}
+  .dtable td.num,.dtable th.num{text-align:right}
+  .dtable tbody tr:nth-child(even){background:rgba(255,255,255,.028)}
+  .dtable .mono{font-family:ui-monospace,Menlo,monospace;color:var(--sev0)}
+
   /* ---------- impressão / export PDF ---------- */
   @page{size:1280px 720px;margin:0}
   @media print{
@@ -359,6 +371,34 @@
           <div class="cap">O índice separa bem — poucos acidentes concentram a severidade</div>
           <div class="chart" id="c_classe"></div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRUSTED — HEAD DO DATASET -->
+  <section class="slide" id="s13">
+    <div class="eyebrow anim">Camada Trusted</div>
+    <h2 class="anim">O dado limpo, no nível do acidente</h2>
+    <div class="sub anim d1">Após o ETL: 145.685 boletins da PRF (2024–2025) tipados e validados em parquet. Amostra — 10 linhas, 9 de 31 colunas.</div>
+    <div class="slide-body">
+      <div class="card anim d2" style="flex:none">
+        <h3>acidentes_trusted.parquet · head(10)</h3>
+        <div class="cap">Cada linha é um acidente</div>
+        <div class="dtable-wrap"><table class="dtable"><thead><tr><th>data</th><th>uf</th><th class="num">br</th><th class="num">km</th><th>município</th><th>tipo_acidente</th><th>tipo_pista</th><th class="num">mortos</th><th class="num">feridos</th></tr></thead><tbody><tr><td class="mono">2024-09-07</td><td>PR</td><td class="num">116</td><td class="num">211.0</td><td>RIO NEGRO</td><td>Saída de leito carroçável</td><td>Simples</td><td class="num">0</td><td class="num">0</td></tr><tr><td class="mono">2024-08-30</td><td>MG</td><td class="num">40</td><td class="num">523.0</td><td>CONTAGEM</td><td>Colisão traseira</td><td>Dupla</td><td class="num">0</td><td class="num">1</td></tr><tr><td class="mono">2024-12-29</td><td>PR</td><td class="num">277</td><td class="num">240.7</td><td>FERNANDES PINHEIRO</td><td>Colisão com objeto</td><td>Simples</td><td class="num">0</td><td class="num">2</td></tr><tr><td class="mono">2024-05-24</td><td>SC</td><td class="num">470</td><td class="num">91.0</td><td>ASCURRA</td><td>Colisão com objeto</td><td>Simples</td><td class="num">0</td><td class="num">1</td></tr><tr><td class="mono">2024-03-20</td><td>RO</td><td class="num">425</td><td class="num">79.0</td><td>NOVA MAMORE</td><td>Colisão frontal</td><td>Simples</td><td class="num">1</td><td class="num">0</td></tr><tr><td class="mono">2024-02-02</td><td>MG</td><td class="num">262</td><td class="num">427.0</td><td>SAO GONCALO DO PARA</td><td>Colisão traseira</td><td>Dupla</td><td class="num">0</td><td class="num">1</td></tr><tr><td class="mono">2024-03-02</td><td>MT</td><td class="num">163</td><td class="num">818.9</td><td>SINOP</td><td>Colisão frontal</td><td>Simples</td><td class="num">0</td><td class="num">2</td></tr><tr><td class="mono">2024-03-21</td><td>RJ</td><td class="num">493</td><td class="num">18.1</td><td>GUAPIMIRIM</td><td>Colisão frontal</td><td>Simples</td><td class="num">0</td><td class="num">3</td></tr><tr><td class="mono">2024-08-20</td><td>MG</td><td class="num">116</td><td class="num">13.6</td><td>AGUAS VERMELHAS</td><td>Saída de leito carroçável</td><td>Simples</td><td class="num">0</td><td class="num">1</td></tr><tr><td class="mono">2024-06-09</td><td>RO</td><td class="num">435</td><td class="num">89.0</td><td>COLORADO DO OESTE</td><td>Colisão traseira</td><td>Simples</td><td class="num">1</td><td class="num">1</td></tr></tbody></table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ANALYTICS — HEAD DO DATASET DE TRECHOS -->
+  <section class="slide" id="s14">
+    <div class="eyebrow anim">Camada Analytics</div>
+    <h2 class="anim">Agregado por trecho, pronto para analisar</h2>
+    <div class="sub anim d1">Os acidentes viram 33.024 trechos (UF_BR_km) com métricas de frequência e gravidade. Amostra — 10 linhas, 9 de 13 colunas.</div>
+    <div class="slide-body">
+      <div class="card anim d2" style="flex:none">
+        <h3>trechos_analytics.parquet · head(10)</h3>
+        <div class="cap">Cada linha é um trecho de rodovia (ordenado por gravidade total)</div>
+        <div class="dtable-wrap"><table class="dtable"><thead><tr><th>trecho</th><th>uf</th><th class="num">br</th><th class="num">qtd_acid</th><th class="num">mortos</th><th class="num">fer_graves</th><th class="num">íg_médio</th><th class="num">íg_total</th><th class="num">%_fatais</th></tr></thead><tbody><tr><td class="mono">MG_116_286</td><td>MG</td><td class="num">116</td><td class="num">9</td><td class="num">38</td><td class="num">7</td><td class="num">58.44</td><td class="num">526</td><td class="num">22.22</td></tr><tr><td class="mono">SC_101_206</td><td>SC</td><td class="num">101</td><td class="num">155</td><td class="num">1</td><td class="num">37</td><td class="num">3.38</td><td class="num">524</td><td class="num">0.65</td></tr><tr><td class="mono">SC_101_207</td><td>SC</td><td class="num">101</td><td class="num">153</td><td class="num">1</td><td class="num">26</td><td class="num">3.20</td><td class="num">490</td><td class="num">0.65</td></tr><tr><td class="mono">PE_101_69</td><td>PE</td><td class="num">101</td><td class="num">109</td><td class="num">3</td><td class="num">40</td><td class="num">4.20</td><td class="num">458</td><td class="num">2.75</td></tr><tr><td class="mono">SC_101_205</td><td>SC</td><td class="num">101</td><td class="num">136</td><td class="num">5</td><td class="num">23</td><td class="num">3.16</td><td class="num">430</td><td class="num">2.94</td></tr><tr><td class="mono">SC_101_204</td><td>SC</td><td class="num">101</td><td class="num">137</td><td class="num">1</td><td class="num">31</td><td class="num">3.12</td><td class="num">428</td><td class="num">0.73</td></tr><tr><td class="mono">ES_101_270</td><td>ES</td><td class="num">101</td><td class="num">117</td><td class="num">2</td><td class="num">33</td><td class="num">3.64</td><td class="num">426</td><td class="num">1.71</td></tr><tr><td class="mono">SP_116_219</td><td>SP</td><td class="num">116</td><td class="num">140</td><td class="num">3</td><td class="num">14</td><td class="num">2.91</td><td class="num">408</td><td class="num">1.43</td></tr><tr><td class="mono">PE_101_70</td><td>PE</td><td class="num">101</td><td class="num">95</td><td class="num">4</td><td class="num">31</td><td class="num">4.04</td><td class="num">384</td><td class="num">4.21</td></tr><tr><td class="mono">SP_116_222</td><td>SP</td><td class="num">116</td><td class="num">99</td><td class="num">2</td><td class="num">25</td><td class="num">3.82</td><td class="num">378</td><td class="num">2.02</td></tr></tbody></table></div>
       </div>
     </div>
   </section>
