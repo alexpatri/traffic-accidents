@@ -621,3 +621,106 @@ Múltipla (~3,5; ~4,0%) — o que **confirma a EDA**, não revela perfis inédit
 é metodológica (K-Means euclidiano é fraco em dados majoritariamente one-hot; K-prototypes
 recuperaria a mesma partição). O conhecimento contexto → severidade dos acidentes é melhor
 explorado pela EDA Analytics e pela etapa de ML supervisionado.
+
+# ML Supervisionado — Classificação de Risco de Trechos (bônus)
+
+> **Etapa bônus / exploratória.** Não é a entrega central do projeto (essa é a
+> clusterização de trechos) — é um complemento que demonstra a **viabilidade** de prever o
+> nível de risco de um trecho a partir de características da via. As métricas são modestas de
+> propósito (sem vazamento, validadas por transferência): elas mostram que a estrutura da
+> via explica **parte** do risco, e que uma **predição mais precisa provavelmente exigirá
+> fatores adicionais** hoje ausentes da base — sobretudo **velocidade/limite da via**, além
+> de volume de tráfego, geometria fina e fiscalização.
+
+Aprendizado supervisionado para classificar cada trecho num **nível ordinal de risco**
+(Baixa < Média < Alta < Crítica) e responder *"este trecho tende a ser de alto risco?"*,
+subsidiando a priorização de investimentos. Código em `src/ml/` (`python -m src.ml.main`);
+artefatos em `outputs/ml/` (relatório, figuras, `.joblib` e predições).
+
+**Princípio de validade — generalizar a outras vias.** O modelo aprende com
+**características do trecho**, não com sua localização: a matriz **exclui identificadores**
+(`br`, `km_faixa`, `km`, `trecho`) e **todo desfecho** (`indice_gravidade*`, `mortos`,
+`feridos_*`, `fatal`, `classe_gravidade`, `qtd_acidentes*`, `pct_acidentes_fatais`). Um
+`assert` em `src/ml/features.py` falha se qualquer uma entrar na matriz.
+
+## 1. Alvo e amostra
+
+- **Alvo:** discretização de `indice_gravidade_medio` (severidade média por acidente do
+  trecho) em 4 níveis. A discretização não é causal nem usa desfecho como feature.
+- **Filtro de ruído:** só trechos com **≥ 3 acidentes** (com 1–2 o índice médio é instável)
+  → **13.619** trechos (de 33.024).
+- **Cortes:** a estratégia inicial (limites do `classe_gravidade`: 2/8/20) produziu alvo
+  **degenerado** (Crítica ~0,5%, Média ~77%); migrou-se para **cortes por quantil**
+  (limites ≈ [2,79; 4,0; 5,5]), gerando 4 faixas balanceadas de prioridade:
+
+| Classe | % dos trechos |
+|---|---|
+| Baixa | 25,0% |
+| Média | 30,6% |
+| Alta | 19,7% |
+| Crítica | 24,7% |
+
+## 2. Features e variantes
+
+Atributos estruturais agregados por trecho (reuso do padrão `agregar_por_trecho`):
+**tipo de pista** predominante, **proporção de traçado** (reta/curva/declive/aclive/
+interseção/ponte/túnel/rotatória), **% urbano** e **média de veículos**. Três variantes
+comparadas: **fisico** (V1), **fisico+região** (V2, região derivada da UF) e **fisico+UF**
+(V3). Modelos: Regressão Logística, Random Forest e HistGradientBoosting, todos com
+`class_weight="balanced"` num `Pipeline` com `StandardScaler` e hiperparâmetros ajustados
+por `RandomizedSearchCV`. **Validação por grupo (rodovia/BR):** holdout e CV usam
+`StratifiedGroupKFold` (5 folds) com as **BRs disjuntas**, medindo a generalização a vias
+**não vistas** — não um split aleatório (que inflaria a métrica decorando trechos da mesma
+rodovia).
+
+## 3. Resultados e escolha do modelo
+
+Melhor modelo por variante (validação por grupo/BR):
+
+| Variante | Melhor modelo | CV F1 macro | QWK | Bin AUC (Alta∪Crítica) |
+|---|---|---|---|---|
+| fisico | random_forest | 0,353 | 0,220 | 0,636 |
+| **fisico+região** | **logreg** | **0,358** | **0,262** | **0,651** |
+| fisico+UF | hist_gboost | 0,360 | 0,252 | 0,647 |
+
+> **Transferibilidade × desempenho.** Sob validação por rodovia, os três níveis ficam
+> **praticamente empatados** (0,353 → 0,358 → 0,360): adicionar localização (região/UF)
+> agrega pouquíssimo à generalização — o sinal está mesmo nas **características físicas** da
+> via. O **modelo de entrega é `fisico+região`** (transferível, 18 features). Curiosamente,
+> o desempenho por BR ≈ o de um split aleatório, o que **confirma que o modelo generaliza a
+> rodovias novas** (não estava decorando localizações).
+
+![Comparação das variantes](outputs/ml/figures/comparacao_variantes.png)
+![Matriz de confusão](outputs/ml/figures/matriz_confusao.png)
+
+## 4. Leitura honesta dos resultados
+
+- **Desempenho modesto e esperado:** F1 macro ≈ 0,36 em 4 classes (acaso 0,25); a **visão
+  binária de triagem** (alto risco = Alta∪Crítica) atinge **AUC ≈ 0,65**. As características
+  da via explicam **parte** do risco — comportamento, velocidade, fiscalização e
+  aleatoriedade (fora das features) dominam o resto. São métricas **honestas, sem
+  vazamento** e **validadas por transferência** (rodovias não vistas).
+- **Técnicas de melhoria testadas:** validação por grupo/BR (adotada — dá métrica confiável
+  e mostra que generaliza), tuning + `StandardScaler` (ganho marginal, adotado) e *denoising*
+  do alvo por *shrinkage* empirical-Bayes (**descartado** — comprime as classes e piora o F1).
+  Nenhuma elevou o teto: ele é **limitado pelos dados**, não pelo algoritmo.
+- A matriz de confusão acerta melhor os **extremos** (Crítica com bom recall, útil para
+  triagem) e confunde a classe intermediária **Alta** (confusão ordinal típica).
+- **Features mais influentes:** uso do solo (`pct_urbano`), tipo de pista (Múltipla) e
+  geometria do traçado (rotatória, curva) — coerente com a EDA. Leitura **associativa, não
+  causal**.
+
+## 5. Limitações
+
+- **Cortes do alvo** são fronteiras sobre um contínuo ruidoso; por quantil, "Crítica"
+  significa "top ~25% mais severos", não um extremo absoluto.
+- **Cobertura:** o filtro ≥ 3 acidentes exclui trechos esparsos; o modelo se aplica a
+  trechos com algum histórico ou a vias novas cujas características físicas sejam conhecidas.
+- A regressão do índice contínuo foi avaliada como alternativa, mas **não superou** a
+  classificação na comparação por faixas (e tem R² baixo, ~0,10) — mantém-se a classificação
+  como entrega.
+- **Para uma predição mais precisa, faltam fatores.** O teto é limitado pelos dados: os
+  ganhos reais viriam de variáveis que de fato dirigem o risco e não estão na base —
+  sobretudo **velocidade/limite da via**, além de **volume de tráfego (VMD)**, geometria
+  fina (raio de curva, rampa), fiscalização/radares e iluminação. É o principal caminho para
+  elevar a qualidade do modelo.
